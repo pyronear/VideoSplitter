@@ -13,12 +13,12 @@ class VideoSplitter:
     Args:
         fname: video file name
         acceptCloseMatches: accept locations with similar names to try to bypass OCR problems
-        max_frames: int, default: 100. Maximum number of frames to analyse
+        max_frames: int, default: 200. Maximum number of frames to analyse
         img_preprocessing (optional): function used to prepare image for OCR
         frame_to_string (optional): function used to extract caption from frame
         extract_coordinates (optional): function used to extract coordinates from caption
     """
-    def __init__(self, fname, acceptCloseMatches = True, max_frames = 100,
+    def __init__(self, fname, acceptCloseMatches = True, max_frames = 200,
                  frame_to_string=frame_to_string,
                  img_preprocessing=prepareOCR,
                  extract_coordinates=extract_coordinates):
