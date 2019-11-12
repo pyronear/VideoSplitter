@@ -165,6 +165,18 @@ def extract_coordinates(caption, pattern = '(X|x)+:(\S+) (¥|Y)+:(\S+) (Z|2|7)+:
             coordinates = coordinates[:-1] + tuple(matches)
         return coordinates
 
+def extract_timestamp(caption, pattern='(\d{4}(:|/)\d{2}(:|/)\d{2})', split=True):
+    """
+    Return a string with date and time extracted from the given string
+    """
+    match = re.split(pattern, caption)
+    try:
+        date = match[1]
+        time = match[-1].split()[0]
+    except IndexError:
+        raise ValueError('Problem extracting timestamp from caption', caption)
+    return ' '.join([date, time])
+
 
 # unittests
 import unittest
@@ -182,6 +194,11 @@ class UtilsTester(unittest.TestCase):
         caption = self.ref['caption']
         coordinates = self.ref['coordinates']
         self.assertEqual(extract_coordinates(caption), coordinates)
+
+    def test_extract_timestamp(self):
+        caption = self.ref['caption']
+        timestamp = self.ref['timestamp']
+        self.assertEqual(extract_timestamp(caption), timestamp)
 
     def test_shape(self):
         self.assertEqual(self.ref['shape'], self.img.shape)
