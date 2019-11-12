@@ -1,6 +1,6 @@
 from bisect import bisect_left, bisect_right
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-from .utils import *
+from utils import *
 
 class VideoSplitter:
     """
@@ -102,7 +102,7 @@ class VideoSplitter:
             if not missing: return
             # Find the start and end of each sequence corresponding to each set of coordinates
             for (frame, coord) in missing.items():
-                self.sequences[coord] = bisect_left(self, self[frame]), bisect_right(self, self[frame]) - 1
+                self.sequences[coord] = bisect_left(self, self[frame]), bisect_right(self, self[frame])
 
     def printSequences(self):
         """
@@ -135,3 +135,61 @@ class VideoSplitter:
 
     def __len__(self):
         return self.Nframes
+
+import unittest
+def getRef():
+    """
+    Return a dictionary containing the test parameters
+    """
+    import urllib
+    url =   'https://gist.githubusercontent.com/blenzi/82746e11119cb88a67603944869e29e2/raw' # noqa: E501
+    return eval(urllib.request.urlopen(url).read())
+
+
+class CaptionTester(unittest.TestCase):
+    """
+    Test caption manipulation
+    """
+    def setUp(self):
+        self.ref = getRef()
+
+    def test_extract_coordinates(self):
+        caption = self.ref['extract']['caption']
+        coordinates = self.ref['extract']['coordinates']
+        self.assertEqual(extract_coordinates(caption), coordinates)
+
+class VideoTester(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        "Setup only once for all tests"
+        cls.ref = getRef()
+        import os
+        if os.path.exists(cls.ref['fname']):
+            fname = cls.ref['fname']
+        else:
+            import pafy
+            cls.vPafy = pafy.new(cls.ref['url'])
+            cls.play = cls.vPafy.getbestvideo(preftype="webm")
+            fname = cls.play.url
+        cls.splitter = VideoSplitter(fname)
+
+    def test_loadFrame(self):
+        frame = self.splitter.loadFrame(self.ref['extract']['frame'])
+        self.assertEqual(len(frame.shape), 3)
+
+    def test_OCR(self):
+        frame = self.splitter.loadFrame(self.ref['extract']['frame'])
+        caption = frame_to_string(prepareOCR(frame))
+        self.assertEqual(caption, self.ref['extract']['caption'])
+
+    def test_findSequences(self):
+        self.splitter.findSequences()
+        seqs = self.splitter.sequences
+        inv_seqs = dict(map(reversed, seqs.items())) # invert keys and values
+        self.splitter.printSequences()
+        print (inv_seqs)
+        self.assertEqual(inv_seqs, self.ref['sequences'])
+
+
+if __name__ == '__main__':
+    unittest.main()

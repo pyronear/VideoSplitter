@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import numpy as np, cv2, pytesseract, re, difflib, math
 from functools import partial
 
@@ -94,7 +96,7 @@ def resizeImage(image, ratio=1, min_width=None, min_height=None):
 
 def prepareOCR(frame, min_height = 100, threshold = 10,
                grayscale = False, invert_colors = False,
-               cropFcn = lambda x: findBlackBand(findLargestTextBox(bottomFraction(x)))):
+               cropFcn = lambda x: findBlackBand(bottomFraction(x))):
     """
     Return a pre-processed image for applying OCR
 
@@ -158,15 +160,7 @@ def extract_coordinates(caption, pattern = '(X|x)+:(\S+) (¥|Y)+:(\S+) (Z|2|7)+:
 
         # Replace location name (last item) by close match if (x,y,z) matches
         possibilities = set(i[-1] for i in possible_matches if i[:-1] == coordinates[:-1])
-        matches = difflib.get_close_matches(coordinates[-1], possibilities, n=1)
+        matches = difflib.get_close_matches(coordinates[-1], possibilities, n=1, cutoff=0.9)
         if matches:
             coordinates = coordinates[:-1] + tuple(matches)
         return coordinates
-
-# Test extract_coordinates
-caption = 'Axis-Jacks X:+169.00 Y:-0.96 2Z:4.4 BLMNV:agoicoec: © 2017 Nevada Seismo Lab 2017:06:26 17:10:38.50'
-caption = 'Axis-Jacks X:+169.00 ¥:-0.96 Z:4.4 BLMNV:agoicoec: © 2017 Nevada Seismo Lab 2017:06:26 17:10:38.50'
-caption = 'Axis-Jacks X:+166.20 Y¥Y:+2.18 Z:3.1 NSL:gkent: © 2017 Nevada Seismo Lab 2017:06:20 22:39:21.98'
-print (extract_coordinates(caption))
-# Old implementation
-#print (extract_coordinates(caption, fixes={'¥': 'Y', 'YY:': 'Y:', 'Z2:': 'Z:', '2Z:': 'Z:', '2:': 'Z:'}, pattern='X:(\S+) Y:(\S+) Z:(\S+) '))
