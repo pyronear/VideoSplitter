@@ -198,8 +198,18 @@ class VideoTester(unittest.TestCase):
         inv_seqs = dict(map(reversed, seqs.items())) # invert keys and values
         self.assertEqual(inv_seqs.keys(), self.ref['sequences'].keys())
 
+    def test_writeSequences(self):
+        "Test writing movie sequences"
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            self.splitter.writeSequences(tmpdirname, min_frames=0)
+            basename, ext = os.path.splitext(os.path.basename(self.splitter.fname))
+            for i in range(len(self.splitter.sequences)):
+                fname = os.path.join(tmpdirname, f'{basename}_seq{i}{ext}')
+                self.assertTrue( os.path.exists(fname) )
+
     def test_writeInfo(self):
-        "Test writing captions, sequences, ..."
+        "Test writing dictionaries with captions, sequences, ..."
         import tempfile
         basename, ext = os.path.splitext(os.path.basename(self.splitter.fname))
         with tempfile.TemporaryDirectory() as tmpdirname:
