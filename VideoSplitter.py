@@ -1,3 +1,4 @@
+import os, pickle
 from bisect import bisect_left, bisect_right
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from utils import *
@@ -115,16 +116,15 @@ class VideoSplitter:
             print (f'{v} \t {k}')
 
 
-    def saveSequences(self, outputdir, min_frames=10):
+    def writeSequences(self, outputdir, min_frames=10):
         """
-        Save each sequence to outputdir as <fname>_seq<suffix>.<ext> where suffix is 0, 1 ...
+        Write each sequence to outputdir as <fname>_seq<suffix>.<ext> where suffix is 0, 1 ...
 
         Args:
             outputdir: str, output directory
             min_frames: int, default: 10. Minimum number of frames with same settings to consider a sequence
         """
         self.findSequences()
-        import os
         if not os.path.isdir(outputdir):
             os.mkdir(outputdir)
         valid_sequences = filter(lambda x: x[1] - x[0] >= min_frames, self.sequences.values())
@@ -133,16 +133,14 @@ class VideoSplitter:
             fname = os.path.join(outputdir, f'{basename}_seq{i}{ext}' )
             ffmpeg_extract_subclip(self.fname, fmin/self.fps, fmax/self.fps, fname)
 
-    def saveInfo(self, outputdir):
+    def writeInfo(self, outputdir):
         """
-        Save dictionaries captions, coordinates, seqID and sequences in pickle files
-        (outputdir/fname_<dictName>.pickle)
+        Write dictionaries in outputdir/fname_<dictName>.pickle where
+        dictName = captions, coordinates, seqID, sequences
 
         Args:
             outputdir: str, output directory
         """
-        import pickle
-        import os
         if not os.path.isdir(outputdir):
             os.mkdir(outputdir)
         basename, ext = os.path.splitext(os.path.basename(self.fname))
@@ -150,7 +148,8 @@ class VideoSplitter:
                  'seqID': self.seqID, 'sequences': self.sequences}
         for k, v in dicts.items():
             fname = os.path.join(outputdir, f'{basename}_{k}.pickle')
-            pickle.dump(v, open(fname, 'wb'))
+            with open(fname, 'wb') as pickleFile:
+                pickle.dump(v, pickleFile)
 
 
     def __len__(self):
@@ -171,7 +170,6 @@ class VideoTester(unittest.TestCase):
     def setUpClass(cls):
         "Setup only once for all tests"
         cls.ref = getRef()
-        import os
         if os.path.exists(cls.ref['fname']):
             fname = cls.ref['fname']
         else:
@@ -185,6 +183,13 @@ class VideoTester(unittest.TestCase):
         frame = self.splitter.loadFrame(self.ref['extract']['frame'])
         self.assertEqual(len(frame.shape), 3)
 
+    def test_analyseFrame(self):
+        # TODO: compare caption and coordinates with expected values (modulo OCR problems)
+        frame_index = self.ref['extract']['frame']
+        self.splitter.getCoordinates(frame_index)
+        self.assertIn(frame_index, self.splitter.captions)
+        self.assertIn(frame_index, self.splitter.coordinates)
+
     def test_findSequences(self):
         "Test frame range in sequences (ignore exact coordinates)"
         self.maxDiff = None
@@ -192,6 +197,21 @@ class VideoTester(unittest.TestCase):
         seqs = self.splitter.sequences
         inv_seqs = dict(map(reversed, seqs.items())) # invert keys and values
         self.assertEqual(inv_seqs.keys(), self.ref['sequences'].keys())
+
+    def test_writeInfo(self):
+        "Test writing captions, sequences, ..."
+        import tempfile
+        basename, ext = os.path.splitext(os.path.basename(self.splitter.fname))
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            self.splitter.writeInfo(tmpdirname)
+            names = 'captions', 'coordinates', 'seqID', 'sequences'
+            dicts = [getattr(self.splitter, name) for name in names]
+            self.assertTrue(any(dicts))
+            for name, d in zip(names, dicts):
+                fname = os.path.join(tmpdirname, f'{basename}_{name}.pickle')
+                with open(fname, 'rb') as pickleFile:
+                    dSaved = pickle.load(pickleFile)
+                    self.assertEqual(d, dSaved)
 
 
 if __name__ == '__main__':
