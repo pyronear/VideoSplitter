@@ -133,6 +133,26 @@ class VideoSplitter:
             fname = os.path.join(outputdir, f'{basename}_seq{i}{ext}' )
             ffmpeg_extract_subclip(self.fname, fmin/self.fps, fmax/self.fps, fname)
 
+    def saveInfo(self, outputdir):
+        """
+        Save dictionaries captions, coordinates, seqID and sequences in pickle files
+        (outputdir/fname_<dictName>.pickle)
+
+        Args:
+            outputdir: str, output directory
+        """
+        import pickle
+        import os
+        if not os.path.isdir(outputdir):
+            os.mkdir(outputdir)
+        basename, ext = os.path.splitext(os.path.basename(self.fname))
+        dicts = {'captions': self.captions, 'coordinates': self.coordinates,
+                 'seqID': self.seqID, 'sequences': self.sequences}
+        for k, v in dicts.items():
+            fname = os.path.join(outputdir, f'{basename}_{k}.pickle')
+            pickle.dump(v, open(fname, 'wb'))
+
+
     def __len__(self):
         return self.Nframes
 
