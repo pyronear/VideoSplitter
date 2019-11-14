@@ -54,8 +54,8 @@ class VideoSplitter:
         """
         if not isinstance(captions, dict):
             if os.path.isdir(captions):
-                fname = os.path.join(captions, f'{self.fname}_captions.pickle')
-                captions = self.loadCaptions(fname)
+                basename, ext = os.path.splitext(os.path.basename(self.fname))
+                captions = os.path.join(captions, f'{basename}_captions.pickle')
             with open(captions, 'rb') as capFile:
                 captions = pickle.load(capFile)
         self.captions = captions
@@ -279,6 +279,24 @@ class VideoTesterWithCaptions(VideoTester):
             captions = yaml.safe_load(yF)
         cls.splitter.loadCaptions(captions)
         cls.testFindSequences = True
+
+    def test_loadCaptions(self):
+        "Test loadCaption from pickle file"
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            basename, ext = os.path.splitext(os.path.basename(self.splitter.fname))
+            fname = os.path.join(tmpdirname, f'{basename}_captions.pickle')
+            captions = self.splitter.captions
+            with open(fname, 'wb') as pickleFile:
+                pickle.dump(captions, pickleFile)
+
+            # Load from fname
+            self.splitter.loadCaptions(fname)
+            self.assertEqual(captions, self.splitter.captions)
+
+            # Load from directory name
+            self.splitter.loadCaptions(tmpdirname)
+            self.assertEqual(captions, self.splitter.captions)
 
 
 if __name__ == '__main__':
