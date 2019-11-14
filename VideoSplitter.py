@@ -118,7 +118,8 @@ class VideoSplitter:
 
     def writeSequences(self, outputdir, min_frames=10):
         """
-        Write each sequence to outputdir as <fname>_seq<suffix>.<ext> where suffix is 0, 1 ...
+        Write each sequence to outputdir as <fname>_seq<fmin>_<fmax>.<ext>
+        where fmin and fmax are the number of first and last frame
 
         Args:
             outputdir: str, output directory
@@ -128,9 +129,9 @@ class VideoSplitter:
         if not os.path.isdir(outputdir):
             os.mkdir(outputdir)
         valid_sequences = filter(lambda x: x[1] - x[0] >= min_frames, self.sequences.values())
-        for i, (fmin, fmax) in enumerate(sorted(valid_sequences)):
+        for (fmin, fmax) in sorted(valid_sequences):
             basename, ext = os.path.splitext(os.path.basename(self.fname))
-            fname = os.path.join(outputdir, f'{basename}_seq{i}{ext}' )
+            fname = os.path.join(outputdir, f'{basename}_seq{fmin}_{fmax}{ext}' )
             ffmpeg_extract_subclip(self.fname, fmin/self.fps, fmax/self.fps, fname)
 
     def writeInfo(self, outputdir):
@@ -204,8 +205,8 @@ class VideoTester(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdirname:
             self.splitter.writeSequences(tmpdirname, min_frames=0)
             basename, ext = os.path.splitext(os.path.basename(self.splitter.fname))
-            for i in range(len(self.splitter.sequences)):
-                fname = os.path.join(tmpdirname, f'{basename}_seq{i}{ext}')
+            for fmin, fmax in self.splitter.sequences.values():
+                fname = os.path.join(tmpdirname, f'{basename}_seq{fmin}_{fmax}{ext}')
                 self.assertTrue( os.path.exists(fname) )
 
     def test_writeInfo(self):
