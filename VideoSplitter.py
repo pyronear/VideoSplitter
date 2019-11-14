@@ -36,15 +36,14 @@ class VideoSplitter:
         self.Nframes = int(self.video.get(cv2.CAP_PROP_FRAME_COUNT))
         self.fps = self.video.get(cv2.CAP_PROP_FPS)
 
-        if captions is None:
-            self.captions = {} # (frame_index, caption)
-            self.coordinates = {} # (frame_index, camera position in x,y,z) N.B.: strings, not float
-            # (coordinates, first frame where coordinates appeared):
-            # represents a sorted list of frames, used for defining the start and end of sequences by bisection
-            self.seqID = {}
-        else:
-            self.loadCaptions(captions)
+        self.captions = {} # (frame_index, caption)
+        self.coordinates = {} # (frame_index, camera position in x,y,z) N.B.: strings, not float
+        # (coordinates, first frame where coordinates appeared):
+        # represents a sorted list of frames, used for defining the start and end of sequences by bisection
+        self.seqID = {}
         self.sequences = {}
+        if captions is not None:
+            self.loadCaptions(captions)
 
     def loadCaptions(self, captions):
         """
@@ -191,13 +190,28 @@ class VideoSplitter:
         return self.Nframes
 
 import unittest
-def getRef():
+def setupTester(cls):
     """
-    Return a dictionary containing the test parameters
+    Prepare tester class for VideoSplitter
     """
-    import urllib
+    import urllib, yaml
+    # Test parameters
     url =   'https://gist.githubusercontent.com/blenzi/82746e11119cb88a67603944869e29e2/raw' # noqa: E501
-    return eval(urllib.request.urlopen(url).read())
+    cls.ref = eval(urllib.request.urlopen(url).read())
+
+    # Stream
+    if os.path.exists(cls.ref['fname']):
+        cls.fname = cls.ref['fname']
+    else:
+        import pafy
+        cls.vPafy = pafy.new(cls.ref['url'])
+        cls.play = cls.vPafy.getbestvideo(preftype="webm")
+        cls.fname = cls.play.url
+
+    # Ref captions
+    yamlFile = "https://gist.github.com/blenzi/02027e8973d79cd89bc601b119d2a190/raw"
+    with urllib.request.urlopen(yamlFile) as yF:
+        cls.captions = yaml.safe_load(yF)
 
 
 class VideoTester(unittest.TestCase):
@@ -207,15 +221,8 @@ class VideoTester(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         "Setup only once for all tests"
-        cls.ref = getRef()
-        if os.path.exists(cls.ref['fname']):
-            fname = cls.ref['fname']
-        else:
-            import pafy
-            cls.vPafy = pafy.new(cls.ref['url'])
-            cls.play = cls.vPafy.getbestvideo(preftype="webm")
-            fname = cls.play.url
-        cls.splitter = VideoSplitter(fname)
+        setupTester(cls)
+        cls.splitter = VideoSplitter(cls.fname)
         cls.testFindSequences = False # skip finding sequences (takes about 30s)
 
     def a_test_loadFrame(self): # call it a_ as they are executed in alphabetical order
@@ -272,12 +279,9 @@ class VideoTesterWithCaptions(VideoTester):
     """
     @classmethod
     def setUpClass(cls):
-        import yaml, urllib
-        yamlFile = "https://gist.github.com/blenzi/02027e8973d79cd89bc601b119d2a190/raw"
-        super().setUpClass()
-        with urllib.request.urlopen(yamlFile) as yF:
-            captions = yaml.safe_load(yF)
-        cls.splitter.loadCaptions(captions)
+        "Setup only once for all tests"
+        setupTester(cls)
+        cls.splitter = VideoSplitter(cls.fname, cls.captions)
         cls.testFindSequences = True
 
     def test_loadCaptions(self):
@@ -286,18 +290,29 @@ class VideoTesterWithCaptions(VideoTester):
         with tempfile.TemporaryDirectory() as tmpdirname:
             basename, ext = os.path.splitext(os.path.basename(self.splitter.fname))
             fname = os.path.join(tmpdirname, f'{basename}_captions.pickle')
-            captions = self.splitter.captions
             with open(fname, 'wb') as pickleFile:
-                pickle.dump(captions, pickleFile)
+                pickle.dump(self.captions, pickleFile)
 
             # Load from fname
             self.splitter.loadCaptions(fname)
-            self.assertEqual(captions, self.splitter.captions)
+            self.assertEqual(self.captions, self.splitter.captions)
 
             # Load from directory name
             self.splitter.loadCaptions(tmpdirname)
-            self.assertEqual(captions, self.splitter.captions)
+            self.assertEqual(self.captions, self.splitter.captions)
 
 
 if __name__ == '__main__':
-    unittest.main()
+    import argparse
+    parser = argparse.ArgumentParser(description='Split videos in sequences')
+    parser.add_argument('filenames', help='Video filenames', nargs='+')
+    parser.add_argument('--outputdir', required=True,
+                        help='Output directory for writing sequences and info')
+    parser.add_argument('--captions', default=None,
+                        help='Pickle file or directory containing captions (optional)')
+    args = parser.parse_args()
+
+    for fname in args.filenames:
+        vs = VideoSplitter(fname, captions=args.captions)
+        vs.writeSequences(args.outputdir)
+        vs.writeInfo(args.outputdir)
