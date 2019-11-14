@@ -18,5 +18,13 @@ To split a video into sequences of frames with the same camera settings: coordin
 
 `python VideoSplitter.py -h` for help
 
+Write to the output directory:
 
+- split videos (`<name>_seq<first_frame>_<last_frame>.<ext>`)
+- info (captions, sequences, ...) in pickle files
+
+### Known issues
+
+- Last split video can last longer than it should. Might be related to `ffmpeg_extract_subclip`. Can be circunvented by skipping frames beyond `<last_frame> - <first_frame>` stored in filename
+- Extracting the caption is not always easy...
 
