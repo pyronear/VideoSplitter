@@ -13,13 +13,15 @@ class VideoSplitter:
 
     Args:
         fname: video file name
+        captions: dict or file containing captions
         acceptCloseMatches: accept locations with similar names to try to bypass OCR problems
         max_frames: int, default: 200. Maximum number of frames to analyse
         img_preprocessing (optional): function used to prepare image for OCR
         frame_to_string (optional): function used to extract caption from frame
         extract_coordinates (optional): function used to extract coordinates from caption
     """
-    def __init__(self, fname, acceptCloseMatches = True, max_frames = 200,
+    def __init__(self, fname, captions = None,
+                 acceptCloseMatches = True, max_frames = 200,
                  frame_to_string=frame_to_string,
                  img_preprocessing=prepareOCR,
                  extract_coordinates=extract_coordinates):
@@ -33,12 +35,32 @@ class VideoSplitter:
         self.video = cv2.VideoCapture(fname)
         self.Nframes = int(self.video.get(cv2.CAP_PROP_FRAME_COUNT))
         self.fps = self.video.get(cv2.CAP_PROP_FPS)
-        self.captions = {} # (frame_index, caption)
-        self.coordinates = {} # (frame_index, camera position in x,y,z) N.B.: strings, not float
-        # (coordinates, first frame where coordinates appeared):
-        # represents a sorted list of frames, used for defining the start and end of sequences by bisection
-        self.seqID = {}
+
+        if captions is None:
+            self.captions = {} # (frame_index, caption)
+            self.coordinates = {} # (frame_index, camera position in x,y,z) N.B.: strings, not float
+            # (coordinates, first frame where coordinates appeared):
+            # represents a sorted list of frames, used for defining the start and end of sequences by bisection
+            self.seqID = {}
+        else:
+            self.loadCaptions(captions)
         self.sequences = {}
+
+    def loadCaptions(self, captions):
+        """
+        Load captions from the given dictionary, file or path and process them
+        in order to extract coordinates and seqID.
+        In case of a path, look for <path>/<fname>_captions.pickle
+        """
+        if not isinstance(captions, dict):
+            if os.path.isdir(captions):
+                fname = os.path.join(captions, f'{self.fname}_captions.pickle')
+                captions = self.loadCaptions(fname)
+            with open(captions, 'rb') as capFile:
+                captions = pickle.load(capFile)
+        self.captions = captions
+        for frame_index in captions:
+            self.processFrame(frame_index)
 
     def loadFrame(self, frame_index):
         """
@@ -48,34 +70,46 @@ class VideoSplitter:
         success, frame = self.video.read()
         return frame if success else None
 
-    def getCoordinates(self, frame_index):
+    def processFrame(self, frame_index, ignore_caption = False):
         """
-        Return the coordinates of the camera for the frame with the given index.
-
-        If requested for the first time, store the coordinates in self.coordinates,
-        the caption in self.caption and check if the frame belongs to a sequence previously identified
+        Extract and process the caption from the given frame, storing it in
+        self.caption if not present, the coordinates in self.coordinates,
+        and check if the frame belongs to a sequence previously identified
         or define a new entry in self.seqID
+
+        Args:
+            frame_index: the frame number
+            ignore_caption: bool (default: False). Extract the caption even if it is
+                            present in self.captions
         """
-        try:
-            return self.coordinates[frame_index]
-        except KeyError: # first time
-            if len(self.coordinates) >= self.max_frames:
+        if ignore_caption or frame_index not in self.captions:
+            if len(self.captions) >= self.max_frames:
                 raise RuntimeError(f'Maximum number of frames ({self.max_frames}) analysed')
             frame = self.loadFrame(frame_index)
             preprocessed = self.img_preprocessing(frame)
             caption = self.frame_to_string(preprocessed)
-            try:
-                coordinates = self.extract_coordinates(caption,
-                                                       possible_matches=self.seqID if self.acceptCloseMatches else [])
-            except ValueError as error:
-                coordinates = ('EXTRACTION FAILED', frame_index, caption)
-
             self.captions[frame_index] = caption
-            self.coordinates[frame_index] = coordinates
-            # If first time the coordinates appeared, add a new item to seqID
-            if coordinates not in self.seqID:
-                self.seqID[coordinates] = frame_index
-            return coordinates
+        else:
+            caption = self.captions[frame_index]
+        try:
+            pm = self.seqID if self.acceptCloseMatches else []
+            coordinates = self.extract_coordinates(caption, possible_matches=pm)
+        except ValueError as error:
+            coordinates = ('EXTRACTION FAILED', frame_index, caption)
+
+        self.coordinates[frame_index] = coordinates
+        # If first time the coordinates appeared, add a new item to seqID
+        if coordinates not in self.seqID:
+            self.seqID[coordinates] = frame_index
+
+    def getCoordinates(self, frame_index):
+        """
+        Return the coordinates of the camera for the frame with the given index.
+
+        """
+        if frame_index not in self.coordinates:
+            self.processFrame(frame_index)
+        return self.coordinates[frame_index]
 
     def printCaptions(self):
         "Print captions"
@@ -167,6 +201,9 @@ def getRef():
 
 
 class VideoTester(unittest.TestCase):
+    """
+    Test VideoSplitter
+    """
     @classmethod
     def setUpClass(cls):
         "Setup only once for all tests"
@@ -179,20 +216,23 @@ class VideoTester(unittest.TestCase):
             cls.play = cls.vPafy.getbestvideo(preftype="webm")
             fname = cls.play.url
         cls.splitter = VideoSplitter(fname)
+        cls.testFindSequences = False # skip finding sequences (takes about 30s)
 
-    def test_loadFrame(self):
+    def a_test_loadFrame(self): # call it a_ as they are executed in alphabetical order
         frame = self.splitter.loadFrame(self.ref['extract']['frame'])
         self.assertEqual(len(frame.shape), 3)
 
     def test_analyseFrame(self):
         # TODO: compare caption and coordinates with expected values (modulo OCR problems)
         frame_index = self.ref['extract']['frame']
-        self.splitter.getCoordinates(frame_index)
+        self.splitter.processFrame(frame_index)
         self.assertIn(frame_index, self.splitter.captions)
         self.assertIn(frame_index, self.splitter.coordinates)
 
     def test_findSequences(self):
         "Test frame range in sequences (ignore exact coordinates)"
+        if not self.testFindSequences:
+            return
         self.maxDiff = None
         self.splitter.findSequences()
         seqs = self.splitter.sequences
@@ -201,6 +241,8 @@ class VideoTester(unittest.TestCase):
 
     def test_writeSequences(self):
         "Test writing movie sequences"
+        if not self.testFindSequences:
+            return
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdirname:
             self.splitter.writeSequences(tmpdirname, min_frames=0)
@@ -223,6 +265,20 @@ class VideoTester(unittest.TestCase):
                 with open(fname, 'rb') as pickleFile:
                     dSaved = pickle.load(pickleFile)
                     self.assertEqual(d, dSaved)
+
+class VideoTesterWithCaptions(VideoTester):
+    """
+    Test VideoSplitter with captions loaded externally
+    """
+    @classmethod
+    def setUpClass(cls):
+        import yaml, urllib
+        yamlFile = "https://gist.github.com/blenzi/02027e8973d79cd89bc601b119d2a190/raw"
+        super().setUpClass()
+        with urllib.request.urlopen(yamlFile) as yF:
+            captions = yaml.safe_load(yF)
+        cls.splitter.loadCaptions(captions)
+        cls.testFindSequences = True
 
 
 if __name__ == '__main__':
