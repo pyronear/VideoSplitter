@@ -136,7 +136,7 @@ class VideoSplitter:
             if not missing: return
             # Find the start and end of each sequence corresponding to each set of coordinates
             for (frame, coord) in missing.items():
-                self.sequences[coord] = bisect_left(self, self[frame]), bisect_right(self, self[frame])
+                self.sequences[coord] = bisect_left(self, self[frame]), bisect_right(self, self[frame]) - 1
 
     def printSequences(self):
         """
@@ -310,9 +310,12 @@ if __name__ == '__main__':
                         help='Output directory for writing sequences and info')
     parser.add_argument('--captions', default=None,
                         help='Pickle file or directory containing captions (optional)')
+    parser.add_argument('--no-print', help='Do not print sequences', action='store_true')
     args = parser.parse_args()
 
     for fname in args.filenames:
         vs = VideoSplitter(fname, captions=args.captions)
         vs.writeSequences(args.outputdir)
+        if not args.no_print:
+            vs.printSequences()
         vs.writeInfo(args.outputdir)
