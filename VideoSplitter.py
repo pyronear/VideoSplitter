@@ -1,7 +1,11 @@
-import os, pickle
+import os
+import pickle
 from bisect import bisect_left, bisect_right
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-from utils import *
+import cv2
+from utils import frame_to_string, prepareOCR, extract_coordinates
+import unittest
+
 
 class VideoSplitter:
     """
@@ -20,8 +24,8 @@ class VideoSplitter:
         frame_to_string (optional): function used to extract caption from frame
         extract_coordinates (optional): function used to extract coordinates from caption
     """
-    def __init__(self, fname, captions = None,
-                 acceptCloseMatches = True, max_frames = 200,
+    def __init__(self, fname, captions=None,
+                 acceptCloseMatches=True, max_frames=200,
                  frame_to_string=frame_to_string,
                  img_preprocessing=prepareOCR,
                  extract_coordinates=extract_coordinates):
@@ -36,8 +40,8 @@ class VideoSplitter:
         self.Nframes = int(self.video.get(cv2.CAP_PROP_FRAME_COUNT))
         self.fps = self.video.get(cv2.CAP_PROP_FPS)
 
-        self.captions = {} # (frame_index, caption)
-        self.coordinates = {} # (frame_index, camera position in x,y,z) N.B.: strings, not float
+        self.captions = {}  # (frame_index, caption)
+        self.coordinates = {}  # (frame_index, camera position in x,y,z) N.B.: strings, not float
         # (coordinates, first frame where coordinates appeared):
         # represents a sorted list of frames, used for defining the start and end of sequences by bisection
         self.seqID = {}
@@ -69,7 +73,7 @@ class VideoSplitter:
         success, frame = self.video.read()
         return frame if success else None
 
-    def processFrame(self, frame_index, ignore_caption = False):
+    def processFrame(self, frame_index, ignore_caption=False):
         """
         Extract and process the caption from the given frame, storing it in
         self.caption if not present, the coordinates in self.coordinates,
@@ -93,7 +97,7 @@ class VideoSplitter:
         try:
             pm = self.seqID if self.acceptCloseMatches else []
             coordinates = self.extract_coordinates(caption, possible_matches=pm)
-        except ValueError as error:
+        except ValueError:
             coordinates = ('EXTRACTION FAILED', frame_index, caption)
 
         self.coordinates[frame_index] = coordinates
@@ -112,15 +116,16 @@ class VideoSplitter:
 
     def printCaptions(self):
         "Print captions"
-        print ('Frame \t Caption')
-        for i in sorted(x.captions.items()): print (f'{i[0]} \t {i[1]}')
+        print('Frame \t Caption')
+        for i in sorted(x.captions.items()):
+            print(f'{i[0]} \t {i[1]}')
 
     def __getitem__(self, item):
         """
         Return the first frame that revealed the sequence to which the given frame belongs.
         This method is called by bisect to find the boundaries of the sequence
         """
-        return self.seqID[ self.getCoordinates(item) ]
+        return self.seqID[self.getCoordinates(item)]
 
     def findSequences(self):
         """
@@ -128,12 +133,13 @@ class VideoSplitter:
         """
         if not self.coordinates:
             # fill coordinates with first and last values if empty
-            self[0], self[self.Nframes-1]
+            self[0], self[self.Nframes - 1]
         while True:
             # Coordinates not yet analysed
-            missing = dict((frame, coord) for (frame, coord) in self.coordinates.items() \
+            missing = dict((frame, coord) for (frame, coord) in self.coordinates.items()
                            if coord not in self.sequences)
-            if not missing: return
+            if not missing:
+                return
             # Find the start and end of each sequence corresponding to each set of coordinates
             for (frame, coord) in missing.items():
                 self.sequences[coord] = bisect_left(self, self[frame]), bisect_right(self, self[frame]) - 1
@@ -144,10 +150,9 @@ class VideoSplitter:
         """
         if not self.sequences:
             return
-        print ('Frames \t Coordinates')
-        for v,k in sorted((v,k) for k,v in self.sequences.items()):
-            print (f'{v} \t {k}')
-
+        print('Frames \t Coordinates')
+        for v, k in sorted((v, k) for k, v in self.sequences.items()):
+            print(f'{v} \t {k}')
 
     def writeSequences(self, outputdir, min_frames=10):
         """
@@ -164,8 +169,8 @@ class VideoSplitter:
         valid_sequences = filter(lambda x: x[1] - x[0] >= min_frames, self.sequences.values())
         for (fmin, fmax) in sorted(valid_sequences):
             basename, ext = os.path.splitext(os.path.basename(self.fname))
-            fname = os.path.join(outputdir, f'{basename}_seq{fmin}_{fmax}{ext}' )
-            ffmpeg_extract_subclip(self.fname, fmin/self.fps, fmax/self.fps, fname)
+            fname = os.path.join(outputdir, f'{basename}_seq{fmin}_{fmax}{ext}')
+            ffmpeg_extract_subclip(self.fname, fmin / self.fps, fmax / self.fps, fname)
 
     def writeInfo(self, outputdir):
         """
@@ -185,18 +190,18 @@ class VideoSplitter:
             with open(fname, 'wb') as pickleFile:
                 pickle.dump(v, pickleFile)
 
-
     def __len__(self):
         return self.Nframes
 
-import unittest
+
 def setupTester(cls):
     """
     Prepare tester class for VideoSplitter
     """
-    import urllib, yaml
+    import urllib
+    import yaml
     # Test parameters
-    url =   'https://gist.githubusercontent.com/blenzi/82746e11119cb88a67603944869e29e2/raw' # noqa: E501
+    url = 'https://gist.githubusercontent.com/blenzi/82746e11119cb88a67603944869e29e2/raw'
     cls.ref = eval(urllib.request.urlopen(url).read())
 
     # Stream
@@ -223,9 +228,9 @@ class VideoTester(unittest.TestCase):
         "Setup only once for all tests"
         setupTester(cls)
         cls.splitter = VideoSplitter(cls.fname)
-        cls.testFindSequences = False # skip finding sequences (takes about 30s)
+        cls.testFindSequences = False  # skip finding sequences (takes about 30s)
 
-    def a_test_loadFrame(self): # call it a_ as they are executed in alphabetical order
+    def a_test_loadFrame(self):  # call it a_ as they are executed in alphabetical order
         frame = self.splitter.loadFrame(self.ref['extract']['frame'])
         self.assertEqual(len(frame.shape), 3)
 
@@ -243,7 +248,7 @@ class VideoTester(unittest.TestCase):
         self.maxDiff = None
         self.splitter.findSequences()
         seqs = self.splitter.sequences
-        inv_seqs = dict(map(reversed, seqs.items())) # invert keys and values
+        inv_seqs = dict(map(reversed, seqs.items()))  # invert keys and values
         self.assertEqual(inv_seqs.keys(), self.ref['sequences'].keys())
 
     def test_writeSequences(self):
@@ -256,7 +261,7 @@ class VideoTester(unittest.TestCase):
             basename, ext = os.path.splitext(os.path.basename(self.splitter.fname))
             for fmin, fmax in self.splitter.sequences.values():
                 fname = os.path.join(tmpdirname, f'{basename}_seq{fmin}_{fmax}{ext}')
-                self.assertTrue( os.path.exists(fname) )
+                self.assertTrue(os.path.exists(fname))
 
     def test_writeInfo(self):
         "Test writing dictionaries with captions, sequences, ..."
@@ -272,6 +277,7 @@ class VideoTester(unittest.TestCase):
                 with open(fname, 'rb') as pickleFile:
                     dSaved = pickle.load(pickleFile)
                     self.assertEqual(d, dSaved)
+
 
 class VideoTesterWithCaptions(VideoTester):
     """
