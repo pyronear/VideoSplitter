@@ -38,6 +38,7 @@ class VideoSplitter:
 
         self.video = cv2.VideoCapture(fname)
         self.Nframes = int(self.video.get(cv2.CAP_PROP_FRAME_COUNT))
+        assert self.Nframes > 0, f'Invalid video file {fname}'
         self.fps = self.video.get(cv2.CAP_PROP_FPS)
 
         self.captions = {}  # (frame_index, caption)
@@ -317,10 +318,12 @@ if __name__ == '__main__':
     parser.add_argument('--captions', default=None,
                         help='Pickle file or directory containing captions (optional)')
     parser.add_argument('--no-print', help='Do not print sequences', action='store_true')
+    parser.add_argument('--max-frames', help='Maximum frames to process', default=200,
+                        type=int)
     args = parser.parse_args()
 
     for fname in args.filenames:
-        vs = VideoSplitter(fname, captions=args.captions)
+        vs = VideoSplitter(fname, captions=args.captions, max_frames=args.max_frames)
         vs.writeSequences(args.outputdir)
         if not args.no_print:
             vs.printSequences()
