@@ -46,10 +46,11 @@ def filter_contour(contour, image,
     H, W = (h, w) if not relative else 1. * np.array((h, w)) / image.shape[:2]
     return (min_height <= H <= max_height) and \
            (min_width <= W <= max_width) and \
-           (x < 0.1 * w if 'left' in location else True ) and \
-           (img_w - (x + w) < 0.1 * w if 'right' in location else True ) and \
+           (x < 0.1 * w if 'left' in location else True) and \
+           (img_w - (x + w) < 0.1 * w if 'right' in location else True) and \
            (y < 0.1 * h if 'top' in location else True) and \
-           (img_h - (y + h) < 0.1 * h if 'bottom' in location else True )
+           (img_h - (y + h) < 0.1 * h if 'bottom' in location else True)
+
 
 def findMSER(image, **kw):
     """
