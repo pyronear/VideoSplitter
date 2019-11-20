@@ -318,13 +318,15 @@ if __name__ == '__main__':
     parser.add_argument('--captions', default=None,
                         help='Pickle file or directory containing captions (optional)')
     parser.add_argument('--no-print', help='Do not print sequences', action='store_true')
-    parser.add_argument('--max-frames', help='Maximum frames to process', default=200,
-                        type=int)
+    parser.add_argument('--min-frames', help='Minimum frames to write a sequence (default: 10)',
+                        default=10, type=int)
+    parser.add_argument('--max-frames', help='Maximum frames to process (default: 200)',
+                        default=200, type=int)
     args = parser.parse_args()
 
     for fname in args.filenames:
         vs = VideoSplitter(fname, captions=args.captions, max_frames=args.max_frames)
-        vs.writeSequences(args.outputdir)
+        vs.writeSequences(args.outputdir, min_frames=args.min_frames)
         if not args.no_print:
             vs.printSequences()
         vs.writeInfo(args.outputdir)
