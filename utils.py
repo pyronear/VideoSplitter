@@ -9,6 +9,87 @@ import math
 from functools import partial
 
 
+def apply_threshold(image, threshold=30, invert=True):
+    """
+    Apply threshold to image and invert the colors if requested
+    """
+    # Convert to gray scale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Apply threshold: pixels below (above) become black (white)
+    bw = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)[1]
+    return cv2.bitwise_not(bw) if invert else bw
+
+
+def filter_contour(contour, image,
+                   min_height=3e-3, max_height=0.05, min_width=0.3, max_width=1,
+                   relative=True, location='bottom-left'):
+    """
+    Return true if contour is within min/max width and height,
+    relative to image size if relative = True, and close to given location
+    (top, bottom, right, left, bottom-right, etc)
+
+    contour: cv2 contour or tuple (x, y, w, h)
+    image: image
+    min_height: float (default: 3e-3), minimum image height for contour
+    max_height: float (default: 0.05), maximum image height for contour
+    min_width: float (default: 0.3), minimum image width for contour
+    max_width: float (default: 1), maximum image width for contour
+    relative: bool (default: True), compute min and max values relative to image size
+    location: str (default: 'bottom-left')
+    """
+    img_h, img_w = image.shape[:2]
+    try:
+        x, y, w, h = cv2.boundingRect(contour)
+    except cv2.error:
+        x, y, w, h = contour
+
+    H, W = (h, w) if not relative else 1. * np.array((h, w)) / image.shape[:2]
+    return (min_height <= H <= max_height) and \
+           (min_width <= W <= max_width) and \
+           (x < 0.1 * w if 'left' in location else True ) and \
+           (img_w - (x + w) < 0.1 * w if 'right' in location else True ) and \
+           (y < 0.1 * h if 'top' in location else True) and \
+           (img_h - (y + h) < 0.1 * h if 'bottom' in location else True )
+
+def findMSER(image, **kw):
+    """
+    Return a generator with the rectangular contours around maximally stable extremal
+    regions in the given image
+
+    Args:
+        image: image
+        kw: keyword arguments for filter_contour
+    """
+    bw = apply_threshold(image)
+    mser = cv2.MSER_create()
+    regions, _ = mser.detectRegions(bw)
+    hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
+    for contour in hulls:
+        if filter_contour(contour, image, **kw):
+            yield cv2.boundingRect(contour)
+
+
+def findContours(image, **kw):
+    """
+    Return a generator with rectangular contours of the given image
+
+    Args:
+        image: image
+        kw: keyword arguments for filter_contour
+    """
+    # Apply adaptiveThreshold at the bitwise_not of gray
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bitwise_not(gray)
+    bw = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                               cv2.THRESH_BINARY, 15, -2)
+
+    # Contours
+    contours, hierarchy = cv2.findContours(bw, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    for contour in contours:
+        if filter_contour(contour, image, **kw):
+            yield cv2.boundingRect(contour)
+
+
 def findTextBoxes(image, min_height=5e-3, max_height=1, min_width=5e-3, max_width=1, relative=True):
     """
     Return a generator with all parts of the image that contain text and are within min/max width and height
@@ -206,6 +287,18 @@ class UtilsTester(unittest.TestCase):
         url = 'https://gist.github.com/blenzi/1cf8d14fd01494f7d9c0e34714f35c29/raw'
         self.ref = eval(urllib.request.urlopen(url).read())
         self.img = imutils.url_to_image(self.ref['url'])
+
+    def test_findMSER(self):
+        "Test if at least one region is found with MSER"
+        self.assertTrue(list(findMSER(self.img)))
+
+    def test_findContours(self):
+        "Test if at least one contour is found"
+        self.assertTrue(list(findContours(self.img)))
+
+    def test_filter_contour(self):
+        for contour in findMSER(self.img):
+            self.assertFalse(filter_contour(contour, self.img, location='top'))
 
     def test_extract_coordinates(self):
         caption = self.ref['caption']
