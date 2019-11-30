@@ -2,25 +2,30 @@ import json
 import numpy as np
 import pandas as pd
 import cv2
+import os
+from functools import partial
 
-def getFps(fname):
+def getFps(fname, inputpath=''):
     "Return the number of frames per second for the given movie file"
-    return cv2.VideoCapture(f'../PyroNear/WildFire/{fname}').get(cv2.CAP_PROP_FPS)
+    return cv2.VideoCapture(os.path.join(inputpath, fname)).get(cv2.CAP_PROP_FPS)
 
-def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)'):
+def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)', inputpath=''):
     """
-    Return a DataFrame with file info from the given series with fname:
-    - fBase (fname without _seqX_Y),
-    - splitStart and splitEnd (first and last frame for split file)
-    - fps (frames per second)
+    Return a DataFrame with file info from the given series containing fname
 
     Args:
     - fname: Series
     - pattern: fname pattern to extract fBase, splitStart, splitEnd
+    - inputpath: str, where to find the movie files (default: '')
+
+    Returns: DataFrame with columns
+    - fBase (fname without _seqX_Y),
+    - splitStart and splitEnd (first and last frame for split file)
+    - fps (frames per second)
     """
     d = fname.str.extract(pattern).astype({'splitStart': float, 'splitEnd': float}) # to allow NaN
     d['fBase'] = (d.fBase + '.' + d.ext).fillna(fname)
-    d['fps'] = d.fBase.apply(getFps)
+    d['fps'] = d.fBase.apply(partial(getFps, inputpath=inputpath))
     return d[['fBase', 'fps', 'splitStart', 'splitEnd']]
 
 
@@ -83,7 +88,8 @@ class jsonParser:
     19_seq0_591.mp4 	0 	10 	19_seq0_591.mp4 	19.mp4 	25.0 	1 	0 	0 	2 	True 	568.205 	358.974 	2.261 	57.0 	591.0
 
     """
-    def __init__(self, fname):
+    def __init__(self, fname, inputpath=''):
+        self.inputpath = inputpath
         with open(fname) as jsonFile:
             info = json.load(jsonFile)
 
@@ -91,7 +97,16 @@ class jsonParser:
         self.labels = pd.DataFrame(info['attribute'].values())
         self.labels['class'] = info['attribute'].keys()
 
-        # Annotations: process and cleanup
+        # Annotations
+        self.annotations = pd.DataFrame(info['metadata'].values()).drop(columns='flg')
+
+        # DataFrame with fid and fname. Add fBase, fps, splitStart, splitEnd
+        # only for files with annotations
+        self.files = pd.DataFrame(info['file'].values())[['fid', 'fname']]
+        fnames = self.files.loc[self.files.fid.isin(self.annotations.vid), 'fname']
+        self.files = self.files.join( getFileInfo(fnames, inputpath=self.inputpath) )
+
+        # Process and cleanup annotations to extract keypoints
         # - merge with 'files' to get fname, fBase, fps, splitStart, splitEnd
         # - add information from all other DataFrames (in DFS)
         # - drop columns which are not needed after processing
@@ -99,14 +114,6 @@ class jsonParser:
         # - replace exploitable=NaN by True
         # - sort by fname and t
         # - drop non-exploitable
-        self.annotations = pd.DataFrame(info['metadata'].values()).drop(columns='flg')
-
-        # DataFrame with fid and fname. Add fBase, fps, splitStart, splitEnd
-        # to the ones for which there are annotations
-        self.files = pd.DataFrame(info['file'].values())[['fid', 'fname']]
-        fnames = self.files.loc[self.files.fid.isin(self.annotations.vid), 'fname']
-        self.files = self.files.join( getFileInfo(fnames) )
-
         d = pd.merge(self.annotations, self.files, left_on='vid', right_on='fid')
 
         def splitKeypointValues(x):
@@ -121,15 +128,17 @@ class jsonParser:
         d = d.join(DFS).drop(columns=['fid', 'xy', 'av', 'dummy', 'vid', 'z', 'spatial'])\
              .dropna(how='all', subset=['fire', 'exploitable'])\
              .fillna({'exploitable': True}).sort_values(['fname', 't'])
+
         # Convert time to frame
         d['frame'] = np.round(d.fps * d.t) + d.splitStart.fillna(0)
         self.keypoints = d.loc[d.exploitable != '0']
 
+        # Define states from keypoints
         self.states = self.keypoints.groupby(['fname', 'sequence']).apply(splitStates)
 
 if __name__ == '__main__':
     import sys
     fname = sys.argv[1]
-    x = jsonParser(fname)
+    x = jsonParser(fname, inputpath='../PyroNear/WildFire/')
     print(x.keypoints)
     print(x.states)
