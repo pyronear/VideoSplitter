@@ -5,11 +5,11 @@ import cv2
 import os
 from functools import partial
 
-def getFps(fname, inputpath=''):
+def getFps(fname, inputpath='.'):
     "Return the number of frames per second for the given movie file"
     return cv2.VideoCapture(os.path.join(inputpath, fname)).get(cv2.CAP_PROP_FPS)
 
-def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)', inputpath=''):
+def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)', inputpath='.'):
     """
     Return a DataFrame with file info from the given series containing fname
 
@@ -51,7 +51,9 @@ def splitStates(df, stateKeys = ['fire', 'clf_confidence', 'loc_confidence']):
         states.loc[states.index[-1], 'stateEnd'] = states.splitEnd.iloc[-1]
     else:
         states.loc[states.index[-2], 'stateEnd'] += 1
-    return states.dropna(subset=['stateEnd']).drop(columns=['splitStart', 'splitEnd'])
+    states.dropna(subset=['stateEnd'], inplace=True)
+    np.testing.assert_array_less(states.stateStart, states.stateEnd)
+    return states.drop(columns=['splitStart', 'splitEnd'], errors='ignore')
 
 class jsonParser:
     """
@@ -88,8 +90,9 @@ class jsonParser:
     19_seq0_591.mp4 	0 	10 	19_seq0_591.mp4 	19.mp4 	25.0 	1 	0 	0 	2 	True 	568.205 	358.974 	2.261 	57.0 	591.0
 
     """
-    def __init__(self, fname, inputpath=''):
+    def __init__(self, fname, inputpath='.'):
         self.inputpath = inputpath
+        assert os.path.isdir(inputpath), f'Invalid path: {inputpath}'
         with open(fname) as jsonFile:
             info = json.load(jsonFile)
 
@@ -105,6 +108,9 @@ class jsonParser:
         self.files = pd.DataFrame(info['file'].values())[['fid', 'fname']]
         fnames = self.files.loc[self.files.fid.isin(self.annotations.vid), 'fname']
         self.files = self.files.join( getFileInfo(fnames, inputpath=self.inputpath) )
+        for fname in self.files.fBase.dropna():
+            assert os.path.isfile(os.path.join(inputpath, fname)), f'File {fname} not found in path {inputpath}'
+
 
         # Process and cleanup annotations to extract keypoints
         # - merge with 'files' to get fname, fBase, fps, splitStart, splitEnd
