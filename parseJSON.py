@@ -40,16 +40,49 @@ def splitStates(df, stateKeys = ['fire', 'clf_confidence', 'loc_confidence']):
     # Finally, drop the last row if it remains at NaN (endpoint or no splitEnd defined)
     Next = df.shift(-1)
     Prev = df.shift(1) # NaN in case of 1 row in df
-    new = df.rename(columns={'frame': 'stateStart'}).join(Next.frame.rename('stateEnd') - 1)
-    idxLast = new.iloc[-1].name
-    if not sameState(new.iloc[-1], Prev.iloc[-1]):
-        new.loc[new.index[-1], 'stateEnd'] = new.splitEnd.iloc[-1]
+    states = df.rename(columns={'frame': 'stateStart'}).join(Next.frame.rename('stateEnd') - 1)
+    idxLast = states.iloc[-1].name
+    if not sameState(states.iloc[-1], Prev.iloc[-1]):
+        states.loc[states.index[-1], 'stateEnd'] = states.splitEnd.iloc[-1]
     else:
-        new.loc[new.index[-2], 'stateEnd'] += 1
-    return new.dropna(subset=['stateEnd'])
+        states.loc[states.index[-2], 'stateEnd'] += 1
+    return states.dropna(subset=['stateEnd']).drop(columns=['splitStart', 'splitEnd'])
 
 class jsonParser:
-    ""
+    """
+    Parse JSON file containing annotations for movies and produce the DataFrames described
+    and illustrated below:
+
+    - labels: description of the information used in the annotations
+
+    - files:
+            fid 	fname 	fBase 	fps 	splitStart 	splitEnd
+    0 	1 	10.mp4 	10.mp4 	25.0 	NaN 	NaN
+    1 	2 	19_seq0_591.mp4 	19.mp4 	25.0 	0.0 	591.0
+    2 	3 	19_seq598_608.mp4 	19.mp4 	25.0 	598.0 	608.0
+
+    - keypoints:
+        fname 	fBase 	fps 	splitStart 	splitEnd 	fire 	sequence 	clf_confidence 	loc_confidence 	exploitable 	x 	y 	t 	frame
+    1 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	1 	0 	1 	2 	True 	598.974 	467.692 	1.320 	33.0
+    2 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	1 	0 	1 	2 	True 	609.231 	463.590 	2.826 	71.0
+    3 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	1 	1 	1 	0 	True 	873.846 	500.513 	15.564 	389.0
+    4 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	1 	1 	1 	0 	True 	869.744 	506.667 	18.637 	466.0
+    6 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	0 	2 	1 	0 	True 	724.103 	449.231 	19.779 	494.0
+    5 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	0 	2 	1 	0 	True 	543.590 	418.462 	20.057 	501.0
+    7 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	1 	3 	1 	2 	True 	939.487 	244.103 	28.191 	705.0
+    8 	10.mp4 	10.mp4 	25.0 	NaN 	NaN 	1 	3 	0 	0 	True 	957.949 	237.949 	38.907 	973.0
+    10 	19_seq0_591.mp4 	19.mp4 	25.0 	0.0 	591.0 	1 	0 	0 	2 	True 	568.205 	358.974 	2.261 	57.0
+
+    - states:
+            fname 	fBase 	fps 	fire 	sequence 	clf_confidence 	loc_confidence 	exploitable 	x 	y 	t 	stateStart 	stateEnd
+    fname 	sequence
+    10.mp4 	0 	1 	10.mp4 	10.mp4 	25.0 	1 	0 	1 	2 	True 	598.974 	467.692 	1.320 	33.0 	71.0
+    1 	3 	10.mp4 	10.mp4 	25.0 	1 	1 	1 	0 	True 	873.846 	500.513 	15.564 	389.0 	466.0
+    2 	6 	10.mp4 	10.mp4 	25.0 	0 	2 	1 	0 	True 	724.103 	449.231 	19.779 	494.0 	501.0
+    3 	7 	10.mp4 	10.mp4 	25.0 	1 	3 	1 	2 	True 	939.487 	244.103 	28.191 	705.0 	972.0
+    19_seq0_591.mp4 	0 	10 	19_seq0_591.mp4 	19.mp4 	25.0 	1 	0 	0 	2 	True 	568.205 	358.974 	2.261 	57.0 	591.0
+
+    """
     def __init__(self, fname):
         with open(fname) as jsonFile:
             info = json.load(jsonFile)
@@ -92,13 +125,11 @@ class jsonParser:
         d['frame'] = np.round(d.fps * d.t) + d.splitStart.fillna(0)
         self.keypoints = d.loc[d.exploitable != '0']
 
-def getStates(df):
-    return df.groupby(['fname', 'sequence']).apply(splitStates)
-    #.reset_index().drop(columns=['level_2'])
+        self.states = self.keypoints.groupby(['fname', 'sequence']).apply(splitStates)
 
 if __name__ == '__main__':
     import sys
     fname = sys.argv[1]
     x = jsonParser(fname)
     print(x.keypoints)
-    print(getStates(x.keypoints))
+    print(x.states)
