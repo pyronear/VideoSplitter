@@ -58,8 +58,14 @@ def splitStates(df, stateKeys = ['fire', 'clf_confidence', 'loc_confidence']):
 class jsonParser:
     """
     Parse JSON file containing annotations for movies and produce the DataFrames described
-    and illustrated below:
+    and illustrated below.
 
+    Args:
+    - fname: str, json file
+    - inputpath: str, path of movie files (default: '.')
+    - defineStates: bool, define states from keypoints (default: True)
+
+    Attributes:
     - labels: description of the information used in the annotations
 
     - files:
@@ -90,7 +96,7 @@ class jsonParser:
     19_seq0_591.mp4 	0 	10 	19_seq0_591.mp4 	19.mp4 	25.0 	1 	0 	0 	2 	True 	568.205 	358.974 	2.261 	57.0 	591.0
 
     """
-    def __init__(self, fname, inputpath='.'):
+    def __init__(self, fname, inputpath='.', defineStates=True):
         self.inputpath = inputpath
         assert os.path.isdir(inputpath), f'Invalid path: {inputpath}'
         with open(fname) as jsonFile:
@@ -140,7 +146,8 @@ class jsonParser:
         self.keypoints = d.loc[d.exploitable != '0']
 
         # Define states from keypoints
-        self.states = self.keypoints.groupby(['fname', 'sequence']).apply(splitStates)
+        if defineStates:
+            self.states = self.keypoints.groupby(['fname', 'sequence']).apply(splitStates)
 
 if __name__ == '__main__':
     import sys
