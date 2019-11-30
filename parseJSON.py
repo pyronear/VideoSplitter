@@ -1,8 +1,10 @@
-import json, numpy as np, pandas as pd
+import json
+import numpy as np
+import pandas as pd
+import cv2
 
 def getFps(fname):
     "Return the number of frames per second for the given movie file"
-    import cv2
     return cv2.VideoCapture(f'../PyroNear/WildFire/{fname}').get(cv2.CAP_PROP_FPS)
 
 def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)'):
@@ -90,54 +92,6 @@ class jsonParser:
         d['frame'] = np.round(d.fps * d.t) + d.splitStart.fillna(0)
         self.keypoints = d.loc[d.exploitable != '0']
 
-
-
-def parseJSON(fname):
-    ""
-    with open(fname) as jsonFile:
-        info = json.load(jsonFile)
-
-    # Movie files.
-    # For split files: extract beginning and end of split and set fBase as original file
-    # For non-split files: fBase = fname
-    files = pd.DataFrame(info['file'].values())
-    pattern = '(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)'
-    d = files.fname.str.extract(pattern)
-    d['fBase'] = d.fBase + '.' + d.ext
-    d = d.fillna({'fBase': files['fname']})
-    d['fps'] = d.fBase.apply(fps)
-    files = files.join(d).drop(columns=['type', 'loc', 'src', 'ext'])
-
-    # Annotation labels
-    labels = pd.DataFrame(info['attribute'].values())
-    labels['class'] = info['attribute'].keys()
-
-    # Annotations: process and cleanup
-    # - merge with 'files' to get fname, fBase, fps, splitStart, splitEnd
-    # - add information from all other DataFrames (in DFS)
-    # - drop columns which are not needed after processing
-    # - drop lines where both fire and exploitable are NaN (no annotation)
-    # - replace exploitable=NaN by True
-    # - sort by fname and t
-    # - drop non-exploitable
-    annotations = pd.DataFrame(info['metadata'].values()).drop(columns='flg')
-    d = pd.merge(annotations, files, left_on='vid', right_on='fid')
-
-    def splitKeypointValues(x):
-        "Convert annotation info to a Series with the keys and values"
-        return pd.Series(x).rename(index=dict(zip(labels['class'], labels['aname'])))
-
-    DFS = [
-           d['av'].apply(splitKeypointValues), # annotation info
-           pd.DataFrame(d.xy.tolist(), columns=['dummy', 'x', 'y']), # split xy
-           pd.DataFrame(d.z.tolist(), columns=['t']), # time of keypoint
-          ]
-    d = d.join(DFS).drop(columns=['fid', 'xy', 'av', 'dummy', 'vid', 'z', 'spatial'])\
-         .dropna(how='all', subset=['fire', 'exploitable'])\
-         .fillna({'exploitable': True}).sort_values(['fname', 't'])
-    d['frame'] = np.round(d.fps * d.t) + d.splitStart
-    return d.loc[d.exploitable != '0']
-
 def getStates(df):
     return df.groupby(['fname', 'sequence']).apply(splitStates)
     #.reset_index().drop(columns=['level_2'])
@@ -145,6 +99,6 @@ def getStates(df):
 if __name__ == '__main__':
     import sys
     fname = sys.argv[1]
-    df = parseJSON(fname)
-    print(df)
-    print(getStates(df))
+    x = jsonParser(fname)
+    print(x.keypoints)
+    print(getStates(x.keypoints))
