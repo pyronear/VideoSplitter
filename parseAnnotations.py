@@ -1,3 +1,5 @@
+__doc__ = 'Process movie annotations and write csv files and a number of frames per state'
+
 import json
 import numpy as np
 import pandas as pd
@@ -122,7 +124,7 @@ def writeFrames(labels, inputdir, outputdir):
 
 
 
-class jsonParser:
+class AnnotationParser:
     """
     Parse JSON file containing annotations for movies and produce the DataFrames described
     and illustrated below.
@@ -272,7 +274,7 @@ class jsonParser:
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='Process movie annotations and write csv files and a number of frames per state')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('fname', help='JSON file containing annotations')
     parser.add_argument('-i', '--inputdir', required=True,
                         help='Input directory containing movie files')
@@ -284,7 +286,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', help='Seed for random picking the frames',
                         default=42, type=int)
     args = parser.parse_args()
-    x = jsonParser(args.fname, inputdir=args.inputdir)
+    x = AnnotationParser(args.fname, inputdir=args.inputdir)
     x.writeCsv(args.outputdir)
     x.writeFrames(args.outputdir, args.nFrames, args.random, args.seed)
     #print(x.keypoints)

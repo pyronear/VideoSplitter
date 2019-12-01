@@ -1,5 +1,5 @@
 import unittest
-import parseJSON
+import parseAnnotations
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -24,7 +24,7 @@ class test_functions(unittest.TestCase):
                                  'stateStart': [0, 100, 200],
                                  'stateEnd': [99.0, 199.0, 500.0]})
 
-        pd.testing.assert_frame_equal(parseJSON.splitStates(a), states_a)
+        pd.testing.assert_frame_equal(parseAnnotations.splitStates(a), states_a)
 
     def test_splitStates2(self):
         "Split states without endpoint"
@@ -40,7 +40,7 @@ class test_functions(unittest.TestCase):
                                  'stateStart': [0, 100, 200, 500],
                                  'stateEnd': [99.0, 199.0, 499.0, 700.0]})
 
-        pd.testing.assert_frame_equal(parseJSON.splitStates(b), states_b)
+        pd.testing.assert_frame_equal(parseAnnotations.splitStates(b), states_b)
 
     def test_pickFrames(self):
         states_a = pd.DataFrame({'fire': [0, 1, 1],
@@ -50,20 +50,20 @@ class test_functions(unittest.TestCase):
                                  'stateEnd': [99.0, 199.0, 500.0]})
 
         frames = pd.DataFrame([[0, 49, 99], [100, 149, 199], [200, 350, 500]])
-        x = states_a.apply(partial(parseJSON.pickFrames, nFrames=3, random=False), axis=1)
+        x = states_a.apply(partial(parseAnnotations.pickFrames, nFrames=3, random=False), axis=1)
         pd.testing.assert_frame_equal(x, frames)
 
 
 
 
-class test_parseJSON(unittest.TestCase):
+class test_parseAnnotations(unittest.TestCase):
     """
-    Test parseJSON
+    Test parseAnnotations
     """
     def setUp(self):
         inputJson = Path(sys.argv[0]).parent/'test_3_videos.json'
         inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
-        self.parser = parseJSON.jsonParser(inputJson, inputdir=inputdir)
+        self.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
 
     def test_files(self):
         files = '10.mp4', '19_seq0_591.mp4', '19_seq598_608.mp4'
