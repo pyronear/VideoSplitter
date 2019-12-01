@@ -29,7 +29,7 @@ def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<spl
     return d[['fBase', 'fps', 'splitStart', 'splitEnd']]
 
 
-def splitStates(df, stateKeys = ['fire', 'clf_confidence', 'loc_confidence']):
+def splitStates(df, stateKeys =['fire', 'clf_confidence', 'loc_confidence']):
     """
     Return a DataFrame with one row per state, containing the first and last frames
     (stateStart and stateEnd) in addition to the columns in the given DataFrame
@@ -52,8 +52,10 @@ def splitStates(df, stateKeys = ['fire', 'clf_confidence', 'loc_confidence']):
     else:
         states.loc[states.index[-2], 'stateEnd'] += 1
     states.dropna(subset=['stateEnd'], inplace=True)
-    np.testing.assert_array_less(states.stateStart, states.stateEnd)
-    return states.drop(columns=['splitStart', 'splitEnd'], errors='ignore')
+    # FIXME: find a way to flag invalid and return useful info
+    reject = states.stateStart >= states.stateEnd
+    return states[~reject].drop(columns=['splitStart', 'splitEnd'], errors='ignore')
+
 
 def pickFrames(state, nFrames, random=True, seed=42):
     """
@@ -209,7 +211,13 @@ class jsonParser:
 
         # Convert time to frame
         d['frame'] = np.round(d.fps * d.t) + d.splitStart.fillna(0)
-        self.keypoints = d.loc[d.exploitable != '0']
+
+        # Reject invalid keypoints
+        # FIXME: frame == splitEnd can remove end of sequence.
+        # Should not be a problem but needs testing
+        reject = d.eval('exploitable == "0" or frame >= splitEnd') | d.frame.isna()
+        self.rejected = d[reject]
+        self.keypoints = d[~reject]
 
         # Define states from keypoints
         if defineStates:
@@ -225,6 +233,7 @@ class jsonParser:
             os.mkdir(outputdir)
 
         basename = os.path.splitext(os.path.basename(self.fname))[0]
+        print(f'Writing csv files with keypoints and states to {outputdir}')
         self.keypoints.to_csv(os.path.join(outputdir, basename) +  '.keypoints.csv')
         try:
             self.states.to_csv(os.path.join(outputdir, basename) +  '.states.csv')
@@ -252,12 +261,13 @@ class jsonParser:
 
         basename = os.path.splitext(os.path.basename(self.fname))[0]
         fLabels = os.path.join(outputdir, basename) +  '.labels.csv'
+        print(f'Writing frame labels to {fLabels}')
         labels.to_csv(fLabels)
-        print(f'Frame labels written to {fLabels}')
 
         # Write frames
+        print(f'Extracting frames to {outputdir}')
         writeFrames(labels, self.inputdir, outputdir)
-        print(f'Frames extracted to {outputdir}')
+
 
 
 if __name__ == '__main__':
@@ -275,11 +285,13 @@ if __name__ == '__main__':
                         default=42, type=int)
     args = parser.parse_args()
     x = jsonParser(args.fname, inputdir=args.inputdir)
-    print(x.keypoints)
-    print(x.states)
+    x.writeCsv(args.outputdir)
+    x.writeFrames(args.outputdir, args.nFrames, args.random, args.seed)
+    #print(x.keypoints)
+    #print(x.states)
 
 # TODO:
 # - Test for getFrameLabels
-# - save rejected annotations (not exploitable, not splitStart < frame < splitEnd)
-# - write csvs and images (random or linspace)
+# - save rejected states
 # - tests for rejections
+# - open and keep movie instances ?
