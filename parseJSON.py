@@ -5,18 +5,18 @@ import cv2
 import os
 from functools import partial
 
-def getFps(fname, inputpath='.'):
+def getFps(fname, inputdir='.'):
     "Return the number of frames per second for the given movie file"
-    return cv2.VideoCapture(os.path.join(inputpath, fname)).get(cv2.CAP_PROP_FPS)
+    return cv2.VideoCapture(os.path.join(inputdir, fname)).get(cv2.CAP_PROP_FPS)
 
-def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)', inputpath='.'):
+def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)', inputdir='.'):
     """
     Return a DataFrame with file info from the given series containing fname
 
     Args:
     - fname: Series
     - pattern: fname pattern to extract fBase, splitStart, splitEnd
-    - inputpath: str, where to find the movie files (default: '')
+    - inputdir: str, where to find the movie files (default: '')
 
     Returns: DataFrame with columns
     - fBase (fname without _seqX_Y),
@@ -25,7 +25,7 @@ def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<spl
     """
     d = fname.str.extract(pattern).astype({'splitStart': float, 'splitEnd': float}) # to allow NaN
     d['fBase'] = (d.fBase + '.' + d.ext).fillna(fname)
-    d['fps'] = d.fBase.apply(partial(getFps, inputpath=inputpath))
+    d['fps'] = d.fBase.apply(partial(getFps, inputdir=inputdir))
     return d[['fBase', 'fps', 'splitStart', 'splitEnd']]
 
 
@@ -62,7 +62,7 @@ class jsonParser:
 
     Args:
     - fname: str, json file
-    - inputpath: str, path of movie files (default: '.')
+    - inputdir: str, path of movie files (default: '.')
     - defineStates: bool, define states from keypoints (default: True)
 
     Attributes:
@@ -96,9 +96,10 @@ class jsonParser:
     19_seq0_591.mp4 	0 	10 	19_seq0_591.mp4 	19.mp4 	25.0 	1 	0 	0 	2 	True 	568.205 	358.974 	2.261 	57.0 	591.0
 
     """
-    def __init__(self, fname, inputpath='.', defineStates=True):
-        self.inputpath = inputpath
-        assert os.path.isdir(inputpath), f'Invalid path: {inputpath}'
+    def __init__(self, fname, inputdir='.', defineStates=True):
+        self.fname = fname
+        self.inputdir = inputdir
+        assert os.path.isdir(inputdir), f'Invalid path: {inputdir}'
         with open(fname) as jsonFile:
             info = json.load(jsonFile)
 
@@ -113,9 +114,9 @@ class jsonParser:
         # only for files with annotations
         self.files = pd.DataFrame(info['file'].values())[['fid', 'fname']]
         fnames = self.files.loc[self.files.fid.isin(self.annotations.vid), 'fname']
-        self.files = self.files.join( getFileInfo(fnames, inputpath=self.inputpath) )
+        self.files = self.files.join( getFileInfo(fnames, inputdir=self.inputdir) )
         for fname in self.files.fBase.dropna():
-            assert os.path.isfile(os.path.join(inputpath, fname)), f'File {fname} not found in path {inputpath}'
+            assert os.path.isfile(os.path.join(inputdir, fname)), f'File {fname} not found in path {inputdir}'
 
 
         # Process and cleanup annotations to extract keypoints
@@ -149,9 +150,44 @@ class jsonParser:
         if defineStates:
             self.states = self.keypoints.groupby(['fname', 'sequence']).apply(splitStates)
 
+    def writeCsv(self, outputdir):
+        """
+        Write csv files with keypoints and states
+
+        Args:
+        - outputdir: path, created if needed
+        """
+        if not os.path.isdir(outputdir):
+            os.mkdir(outputdir)
+
+        basename = os.path.splitext(os.path.basename(self.fname))[0]
+        self.keypoints.to_csv(os.path.join(outputdir, basename) +  '.keypoints.csv')
+        try:
+            self.states.to_csv(os.path.join(outputdir, basename) +  '.states.csv')
+        except AttributeError:
+            pass # states not defined
+
+
 if __name__ == '__main__':
-    import sys
-    fname = sys.argv[1]
-    x = jsonParser(fname, inputpath='../PyroNear/WildFire/')
+    import argparse
+    parser = argparse.ArgumentParser(description='Process movie annotations and write csv files and a number of frames per state')
+    parser.add_argument('fname', help='JSON file containing annotations')
+    parser.add_argument('-i', '--inputdir', required=True,
+                        help='Input directory containing movie files')
+    parser.add_argument('-o', '--outputdir', required=True,
+                        help='Output directory for writing csv files and images')
+    parser.add_argument('-n', '--nFrames', default=0, type=int,
+                        help='Number of frames per state to write')
+    parser.add_argument('--random', help='Pick frames randomly', action='store_true')
+    parser.add_argument('--seed', help='Seed for random picking the frames',
+                        default=42, type=int)
+    args = parser.parse_args()
+    x = jsonParser(args.fname, inputdir=args.inputdir)
     print(x.keypoints)
     print(x.states)
+
+# TODO:
+# - create argparse
+# - save rejected annotations (not exploitable, not splitStart < frame < splitEnd)
+# - write csvs and images (random or linspace)
+# - tests for rejections

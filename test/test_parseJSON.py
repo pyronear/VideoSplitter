@@ -2,7 +2,7 @@ import unittest
 import parseJSON
 import numpy as np
 import pandas as pd
-import os
+from pathlib import Path
 import sys
 
 class test_functions(unittest.TestCase):
@@ -42,16 +42,14 @@ class test_functions(unittest.TestCase):
         pd.testing.assert_frame_equal(parseJSON.splitStates(b), states_b)
 
 
-
-
 class test_parseJSON(unittest.TestCase):
     """
     Test parseJSON
     """
     def setUp(self):
-        inputJson = os.path.join(os.path.dirname(sys.argv[0]), 'test_3_videos.json')
-        inputpath = os.path.expanduser('~/Workarea/Pyronear/Wildfire')
-        self.parser = parseJSON.jsonParser(inputJson, inputpath=inputpath)
+        inputJson = Path(sys.argv[0]).parent/'test_3_videos.json'
+        inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
+        self.parser = parseJSON.jsonParser(inputJson, inputdir=inputdir)
 
     def test_files(self):
         files = '10.mp4', '19_seq0_591.mp4', '19_seq598_608.mp4'
@@ -73,6 +71,18 @@ class test_parseJSON(unittest.TestCase):
 
     def test_states(self):
         pass
+
+    def test_writeCsv(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            self.parser.writeCsv(tmpdirname)
+            tmpdir = Path(tmpdirname)
+            basename = Path(self.parser.fname).name
+            keypointFile = (tmpdir/basename).with_suffix('.keypoints.csv')
+            self.assertTrue(keypointFile.exists())
+            statesFile = (tmpdir/basename).with_suffix('.states.csv')
+            self.assertTrue(statesFile.exists())
+            # TODO: test reading csv and comparing with original
 
 
 if __name__ == '__main__':
