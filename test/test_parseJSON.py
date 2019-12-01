@@ -3,6 +3,7 @@ import parseJSON
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from functools import partial
 import sys
 
 class test_functions(unittest.TestCase):
@@ -40,6 +41,19 @@ class test_functions(unittest.TestCase):
                                  'stateEnd': [99.0, 199.0, 499.0, 700.0]})
 
         pd.testing.assert_frame_equal(parseJSON.splitStates(b), states_b)
+
+    def test_pickFrames(self):
+        states_a = pd.DataFrame({'fire': [0, 1, 1],
+                                 'clf_confidence': [1, 0, 1],
+                                 'loc_confidence': [0, 0, 0],
+                                 'stateStart': [0, 100, 200],
+                                 'stateEnd': [99.0, 199.0, 500.0]})
+
+        frames = pd.DataFrame([[0, 49, 99], [100, 149, 199], [200, 350, 500]])
+        x = states_a.apply(partial(parseJSON.pickFrames, nFrames=3, random=False), axis=1)
+        pd.testing.assert_frame_equal(x, frames)
+
+
 
 
 class test_parseJSON(unittest.TestCase):

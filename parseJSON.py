@@ -55,6 +55,71 @@ def splitStates(df, stateKeys = ['fire', 'clf_confidence', 'loc_confidence']):
     np.testing.assert_array_less(states.stateStart, states.stateEnd)
     return states.drop(columns=['splitStart', 'splitEnd'], errors='ignore')
 
+def pickFrames(state, nFrames, random=True, seed=42):
+    """
+    Return a Series with the list of selected frames for the given state
+
+    Args:
+    - state: Series containing stateStart, stateEnd
+    - nFrames: number of frames to pick
+    - random: bool (default: True). Pick frames randomly or according to np.linspace,
+      e.g. first if nFrames = 1, + last if nFrames = 2, + middle if nFrames = 3, etc
+    - seed: int, seed for random picking (default: 42)
+    """
+    np.random.seed(seed)
+    if random:
+        return pd.Series(np.random.randint(state.stateStart, state.stateEnd, nFrames))
+    else:
+        return pd.Series(np.linspace(state.stateStart, state.stateEnd, nFrames, dtype=int))
+
+
+def getFrameLabels(states, nFrames, **kw):
+    """
+    Given a DataFrame with states, call pickFrames to create a DataFrame with
+    nFrames per state containing the state information, filename and
+    imgFile (the name of the file to be used when writing an image)
+
+    Args:
+    - states: DataFrame containing fBase, stateStart, stateEnd
+    - nFrames: int, number of frames per state
+    - kw: list of keyword arguments for pickFrames
+    """
+    fcn = partial(pickFrames, nFrames=nFrames, **kw)
+    # DataFrame containing columns (0..nFrames - 1)
+    frames = states.apply(fcn, axis=1)
+    # Merge states and frames and transform each value of the new columns into a row
+    # Drop the new column 'variable' that represents the column name in frames
+    df = pd.melt(states.join(frames), id_vars=states.columns,
+                 value_vars=range(nFrames), value_name='frame').drop(columns=['variable'])
+    # Add image file name
+    df['imgFile'] = df.apply(lambda x: os.path.splitext(x.fBase)[0] + f'_frame{x.frame}.png', axis=1)
+    return df.sort_values(['fBase', 'frame'])
+
+
+def writeFrames(labels, inputdir, outputdir):
+    """
+    Extract frames from <inputfile>/<fBase> and write frames as
+    <outputdir>/<fBase>_frame<frame>.png
+
+    Args:
+    - labels: DataFrame containing fBase, frame, imgFile
+    - inputdir: str, directory containing movie files
+    - outputdir: str, output directory. Created if needed
+    """
+    if not os.path.isdir(outputdir):
+        os.mkdir(outputdir)
+    for name, group in labels.groupby('fBase'):
+        movie = cv2.VideoCapture(os.path.join(inputdir, name))
+        for index, row in group.iterrows():
+            movie.set(cv2.CAP_PROP_POS_FRAMES, row.frame)
+            success, frame = movie.read()
+            if success:
+                cv2.imwrite(os.path.join(outputdir, row.imgFile), frame)
+            else:
+                print(f'Could not read frame {row.frame} from {name}')
+
+
+
 class jsonParser:
     """
     Parse JSON file containing annotations for movies and produce the DataFrames described
@@ -150,12 +215,11 @@ class jsonParser:
         if defineStates:
             self.states = self.keypoints.groupby(['fname', 'sequence']).apply(splitStates)
 
+
     def writeCsv(self, outputdir):
         """
-        Write csv files with keypoints and states
-
-        Args:
-        - outputdir: path, created if needed
+        Write csv files with keypoints and states to the given output directory.
+        created if needed
         """
         if not os.path.isdir(outputdir):
             os.mkdir(outputdir)
@@ -166,6 +230,34 @@ class jsonParser:
             self.states.to_csv(os.path.join(outputdir, basename) +  '.states.csv')
         except AttributeError:
             pass # states not defined
+
+
+    def writeFrames(self, outputdir, nFrames, random=True, seed=42):
+        """
+        Write frames from each state as <fBase>_frameX.png as well as a csv file
+        <fname>.labels.csv with their info (frame, fname, state)
+
+        Args:
+        - outputdir: str, output directory. Created if needed
+        - nFrames: int, number of frames per state
+        - random: bool (default: True). Pick frames randomly or according to np.linspace,
+          e.g. first if nFrames = 1, + last if nFrames = 2, + middle if nFrames = 3, etc
+        - seed: int, seed for random picking (default: 42)
+        """
+        labels = getFrameLabels(self.states, nFrames, random=random, seed=seed)
+
+        # Write labels
+        if not os.path.isdir(outputdir):
+            os.mkdir(outputdir)
+
+        basename = os.path.splitext(os.path.basename(self.fname))[0]
+        fLabels = os.path.join(outputdir, basename) +  '.labels.csv'
+        labels.to_csv(fLabels)
+        print(f'Frame labels written to {fLabels}')
+
+        # Write frames
+        writeFrames(labels, self.inputdir, outputdir)
+        print(f'Frames extracted to {outputdir}')
 
 
 if __name__ == '__main__':
@@ -187,7 +279,7 @@ if __name__ == '__main__':
     print(x.states)
 
 # TODO:
-# - create argparse
+# - Test for getFrameLabels
 # - save rejected annotations (not exploitable, not splitStart < frame < splitEnd)
 # - write csvs and images (random or linspace)
 # - tests for rejections
