@@ -4,6 +4,10 @@ import pandas as pd
 from datetime import datetime
 from IPython.display import display
 
+def getImageWidget(imgFile, width=300):
+    with open(imgFile, 'rb') as file:
+        return widgets.Image(value=file.read(), width=300)
+
 class AnnotationChecker:
     """
     Check movie annotations in jupyter notebook
@@ -16,7 +20,7 @@ class AnnotationChecker:
     (checkedLabels.csv)
 
     Args:
-    - inputpath: directory containing image files csv files *.labels.csv with the
+    - inputdir: directory containing image files and csv files (*.labels.csv) with the
       summary of movie annotations:
        * fBase: the original movie file
        * stateStart: the first frame of a sequence with fixed state
@@ -25,13 +29,13 @@ class AnnotationChecker:
        * imgFile: image file name
     - labels: csv file with labels. By default uses all files in inputdir
     """
-    def __init__(self, inputpath, labels=None):
-        self.inputpath = pathlib.Path(inputpath)
-        assert self.inputpath.is_dir(), 'Invalid path {self.inputpath}'
-        self.outputfile = self.inputpath/'checkedLabels.csv'
+    def __init__(self, inputdir, labels=None):
+        self.inputdir = pathlib.Path(inputdir)
+        assert self.inputdir.is_dir(), 'Invalid path {self.inputdir}'
+        self.outputfile = self.inputdir/'checkedLabels.csv'
 
         if labels is None:
-            csvFiles = self.inputpath.glob('*.labels.csv')
+            csvFiles = self.inputdir.glob('*.labels.csv')
             self.labels = pd.concat(map(pd.read_csv, csvFiles))
         else:
             self.labels = pd.read_csv(labels)
@@ -41,9 +45,8 @@ class AnnotationChecker:
         for fBase, fgroup in self.labels.groupby('fBase'):
             tab = widgets.Tab()
             for (first, last), state in fgroup.groupby(['stateStart', 'stateEnd']):
-                imgFiles = [self.inputpath/i for i in state.imgFile.iloc[[0,-1]]]
-                images = [widgets.Image(value=open(imgFile, 'rb').read(), width=300)
-                          for imgFile in imgFiles]
+                imgFiles = [self.inputdir/i for i in state.imgFile.iloc[[0,-1]]]
+                images = [getImageWidget(imgFile) for imgFile in imgFiles]
                 menu = self.getMenu(state.iloc[0])
                 self.menus[state.index] = menu
                 hbox = widgets.HBox(images + [menu])
@@ -61,7 +64,11 @@ class AnnotationChecker:
 
         self.output = widgets.Output()
         self.saveButton.on_click(self.on_saveButton_clicked)
-        self.run()
+        try:
+            get_ipython()
+            self.run()
+        except NameError:
+            pass # do not run outside IPython
 
 
     def run(self):
