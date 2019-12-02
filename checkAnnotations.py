@@ -5,8 +5,12 @@ from datetime import datetime
 from IPython.display import display
 
 def getImageWidget(imgFile, width=300):
-    with open(imgFile, 'rb') as file:
-        return widgets.Image(value=file.read(), width=300)
+    try:
+        with open(imgFile, 'rb') as file:
+            return widgets.Image(value=file.read(), width=300)
+    except FileNotFoundError:
+        print(f'Skipping {imgFile}')
+        return widgets.HBox() # FIXME: find a better solution ?
 
 class AnnotationChecker:
     """
