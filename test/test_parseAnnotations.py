@@ -54,20 +54,28 @@ class test_functions(unittest.TestCase):
         pd.testing.assert_frame_equal(x, frames)
 
 
-
+def setupTester(cls):
+    """
+    Setup tester for AnnotationParser
+    """
+    inputJson = Path(sys.argv[0]).parent/'test_3_videos.json'
+    inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
+    cls.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
 
 class test_parseAnnotations(unittest.TestCase):
     """
     Test parseAnnotations
     """
-    def setUp(self):
-        inputJson = Path(sys.argv[0]).parent/'test_3_videos.json'
-        inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
-        self.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
+    @classmethod
+    def setUpClass(cls):
+        "Setup only once for all tests"
+        setupTester(cls)
+
 
     def test_files(self):
         files = '10.mp4', '19_seq0_591.mp4', '19_seq598_608.mp4'
         np.testing.assert_array_equal(self.parser.files.fname, files)
+
 
     def test_keypoints(self):
         ref_keypoints = pd.DataFrame({
@@ -83,8 +91,10 @@ class test_parseAnnotations(unittest.TestCase):
         keypoints = self.parser.keypoints[ref_keypoints.columns].reset_index(drop=True)
         pd.testing.assert_frame_equal(ref_keypoints, keypoints)
 
+
     def test_states(self):
         pass
+
 
     def test_writeCsv(self):
         import tempfile
