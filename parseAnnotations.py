@@ -228,19 +228,21 @@ class AnnotationParser:
 
     def writeCsv(self, outputdir):
         """
-        Write csv files with keypoints and states to the given output directory.
-        created if needed
+        Write csv files with keypoints, rejected keypoints and states to the given
+        output directory, created if needed
         """
         if not os.path.isdir(outputdir):
             os.mkdir(outputdir)
 
         basename = os.path.splitext(os.path.basename(self.fname))[0]
-        print(f'Writing csv files with keypoints and states to {outputdir}')
-        self.keypoints.to_csv(os.path.join(outputdir, basename) +  '.keypoints.csv', index=False)
-        try:
-            self.states.to_csv(os.path.join(outputdir, basename) +  '.states.csv', index=False)
-        except AttributeError:
-            pass # states not defined
+        for name in 'keypoints', 'rejected', 'states':
+            df = getattr(self, name)
+            fname = f'{os.path.join(outputdir, basename)}.{name}.csv'
+            print(f'Writing csv file {fname}')
+            try:
+                df.to_csv(fname, index=False)
+            except AttributeError:
+                pass # states not defined
 
 
     def writeFrames(self, outputdir, nFrames, random=True, seed=42):
@@ -288,7 +290,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     x = AnnotationParser(args.fname, inputdir=args.inputdir)
     x.writeCsv(args.outputdir)
-    x.writeFrames(args.outputdir, args.nFrames, args.random, args.seed)
+    if args.nFrames > 0:
+        x.writeFrames(args.outputdir, args.nFrames, args.random, args.seed)
     #print(x.keypoints)
     #print(x.states)
 
