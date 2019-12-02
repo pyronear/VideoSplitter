@@ -236,9 +236,9 @@ class AnnotationParser:
 
         basename = os.path.splitext(os.path.basename(self.fname))[0]
         print(f'Writing csv files with keypoints and states to {outputdir}')
-        self.keypoints.to_csv(os.path.join(outputdir, basename) +  '.keypoints.csv')
+        self.keypoints.to_csv(os.path.join(outputdir, basename) +  '.keypoints.csv', index=False)
         try:
-            self.states.to_csv(os.path.join(outputdir, basename) +  '.states.csv')
+            self.states.to_csv(os.path.join(outputdir, basename) +  '.states.csv', index=False)
         except AttributeError:
             pass # states not defined
 
@@ -264,10 +264,10 @@ class AnnotationParser:
         basename = os.path.splitext(os.path.basename(self.fname))[0]
         fLabels = os.path.join(outputdir, basename) +  '.labels.csv'
         print(f'Writing frame labels to {fLabels}')
-        labels.to_csv(fLabels)
+        labels.to_csv(fLabels, index=False)
 
         # Write frames
-        print(f'Extracting frames to {outputdir}')
+        print(f'Extracting {nFrames} frames per state ({len(labels)} in total) to {outputdir}')
         writeFrames(labels, self.inputdir, outputdir)
 
 
