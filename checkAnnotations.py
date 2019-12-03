@@ -4,13 +4,15 @@ import pandas as pd
 from datetime import datetime
 from IPython.display import display
 
+
 def getImageWidget(imgFile, width=300):
     try:
         with open(imgFile, 'rb') as file:
             return widgets.Image(value=file.read(), width=300)
     except FileNotFoundError:
         print(f'Skipping {imgFile}')
-        return widgets.HBox() # FIXME: find a better solution ?
+        return widgets.HBox()  # FIXME: find a better solution ?
+
 
 class AnnotationChecker:
     """
@@ -36,7 +38,7 @@ class AnnotationChecker:
     def __init__(self, inputdir, labels=None):
         self.inputdir = pathlib.Path(inputdir)
         assert self.inputdir.is_dir(), 'Invalid path {self.inputdir}'
-        self.outputfile = self.inputdir/'checkedLabels.csv'
+        self.outputfile = self.inputdir / 'checkedLabels.csv'
 
         if labels is None:
             csvFiles = self.inputdir.glob('*.labels.csv')
@@ -49,13 +51,14 @@ class AnnotationChecker:
         for fBase, fgroup in self.labels.groupby('fBase'):
             tab = widgets.Tab()
             for (first, last), state in fgroup.groupby(['stateStart', 'stateEnd']):
-                imgFiles = [self.inputdir/i for i in state.imgFile.iloc[[0,-1]]]
+                # First and last images of each state
+                imgFiles = [self.inputdir / i for i in state.imgFile.iloc[[0, -1]]]
                 images = [getImageWidget(imgFile) for imgFile in imgFiles]
                 menu = self.getMenu(state.iloc[0])
                 self.menus[state.index] = menu
                 hbox = widgets.HBox(images + [menu])
                 tab.children += (hbox,)
-                tab.set_title(len(tab.children)-1, f'Frames {int(first)}-{int(last)}')
+                tab.set_title(len(tab.children) - 1, f'Frames {int(first)}-{int(last)}')
 
             accordion.children += (tab,)
             accordion.set_title(len(accordion.children) - 1, fBase)
@@ -72,13 +75,11 @@ class AnnotationChecker:
             get_ipython()
             self.run()
         except NameError:
-            pass # do not run outside IPython
-
+            pass  # do not run outside IPython
 
     def run(self):
         "Display widgets"
         display(self.accordion, self.saveButton, self.output)
-
 
     def getMenu(self, state):
         "Return widgets with state options"
@@ -96,7 +97,6 @@ class AnnotationChecker:
                                  description='Location:',
                                  value='Precise' if state['loc_confidence'] == 2 else 'Not precise')])
 
-
     def on_saveButton_clicked(self, button):
         self.updateValues()
         self.labels.to_csv(self.outputfile, index=False)
@@ -104,14 +104,13 @@ class AnnotationChecker:
             self.output.clear_output()
             print(f"Info written to {self.outputfile} ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
 
-
     def updateValues(self):
         "Read values from menus and update self.labels"
         keys = 'exploitable', 'fire', 'clf_confidence', 'loc_confidence'
+
         def readValues(menu):
             values = [i.value in ('Yes', 'Precise') for i in menu.children]
-            values[keys.index('loc_confidence')] += 1 # confident is 2, not-confident is 1
+            values[keys.index('loc_confidence')] += 1  # confident is 2, not-confident is 1
             return pd.Series(values, index=keys)
 
         self.labels.update(self.menus.apply(readValues))
-

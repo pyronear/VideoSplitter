@@ -7,11 +7,13 @@ import cv2
 import os
 from functools import partial
 
+
 def getFps(fname, inputdir='.'):
     "Return the number of frames per second for the given movie file"
     return cv2.VideoCapture(os.path.join(inputdir, fname)).get(cv2.CAP_PROP_FPS)
 
-def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)', inputdir='.'):
+
+def getFileInfo(fname, pattern=r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<splitEnd>\d+).(?P<ext>\w+)', inputdir='.'):
     """
     Return a DataFrame with file info from the given series containing fname
 
@@ -25,13 +27,13 @@ def getFileInfo(fname, pattern = r'(?P<fBase>\w+)_seq(?P<splitStart>\d+)_(?P<spl
     - splitStart and splitEnd (first and last frame for split file)
     - fps (frames per second)
     """
-    d = fname.str.extract(pattern).astype({'splitStart': float, 'splitEnd': float}) # to allow NaN
+    d = fname.str.extract(pattern).astype({'splitStart': float, 'splitEnd': float})  # to allow NaN
     d['fBase'] = (d.fBase + '.' + d.ext).fillna(fname)
     d['fps'] = d.fBase.apply(partial(getFps, inputdir=inputdir))
     return d[['fBase', 'fps', 'splitStart', 'splitEnd']]
 
 
-def splitStates(df, stateKeys =['fire', 'clf_confidence', 'loc_confidence']):
+def splitStates(df, stateKeys=['fire', 'clf_confidence', 'loc_confidence']):
     """
     Return a DataFrame with one row per state, containing the first and last frames
     (stateStart and stateEnd) in addition to the columns in the given DataFrame
@@ -46,9 +48,8 @@ def splitStates(df, stateKeys =['fire', 'clf_confidence', 'loc_confidence']):
     # Otherwise there was no endpoint in the sequence, set it to splitEnd
     # Finally, drop the last row if it remains at NaN (endpoint or no splitEnd defined)
     Next = df.shift(-1)
-    Prev = df.shift(1) # NaN in case of 1 row in df
+    Prev = df.shift(1)  # NaN in case of 1 row in df
     states = df.rename(columns={'frame': 'stateStart'}).join(Next.frame.rename('stateEnd') - 1)
-    idxLast = states.iloc[-1].name
     if not sameState(states.iloc[-1], Prev.iloc[-1]):
         states.loc[states.index[-1], 'stateEnd'] = states.splitEnd.iloc[-1]
     else:
@@ -123,7 +124,6 @@ def writeFrames(labels, inputdir, outputdir):
                 print(f'Could not read frame {row.frame} from {name}')
 
 
-
 class AnnotationParser:
     """
     Parse JSON file containing annotations for movies and produce the DataFrames described
@@ -183,10 +183,9 @@ class AnnotationParser:
         # only for files with annotations
         self.files = pd.DataFrame(info['file'].values())[['fid', 'fname']]
         fnames = self.files.loc[self.files.fid.isin(self.annotations.vid), 'fname']
-        self.files = self.files.join( getFileInfo(fnames, inputdir=self.inputdir) )
+        self.files = self.files.join(getFileInfo(fnames, inputdir=self.inputdir))
         for fname in self.files.fBase.dropna():
             assert os.path.isfile(os.path.join(inputdir, fname)), f'File {fname} not found in path {inputdir}'
-
 
         # Process and cleanup annotations to extract keypoints
         # - merge with 'files' to get fname, fBase, fps, splitStart, splitEnd
@@ -203,10 +202,10 @@ class AnnotationParser:
             return pd.Series(x).rename(index=dict(zip(self.labels['class'], self.labels['aname'])))
 
         DFS = [
-               d['av'].apply(splitKeypointValues), # annotation info
-               pd.DataFrame(d.xy.tolist(), columns=['dummy', 'x', 'y']), # split xy
-               pd.DataFrame(d.z.tolist(), columns=['t']), # time of keypoint
-              ]
+            d['av'].apply(splitKeypointValues),  # annotation info
+            pd.DataFrame(d.xy.tolist(), columns=['dummy', 'x', 'y']),  # split xy
+            pd.DataFrame(d.z.tolist(), columns=['t']),  # time of keypoint
+        ]
         d = d.join(DFS).drop(columns=['fid', 'xy', 'av', 'dummy', 'vid', 'z', 'spatial'])\
              .dropna(how='all', subset=['fire', 'exploitable'])\
              .fillna({'exploitable': True}).sort_values(['fname', 't'])
@@ -225,7 +224,6 @@ class AnnotationParser:
         if defineStates:
             self.states = self.keypoints.groupby(['fname', 'sequence']).apply(splitStates)
 
-
     def writeCsv(self, outputdir):
         """
         Write csv files with keypoints, rejected keypoints and states to the given
@@ -242,8 +240,7 @@ class AnnotationParser:
             try:
                 df.to_csv(fname, index=False)
             except AttributeError:
-                pass # states not defined
-
+                pass  # states not defined
 
     def writeFrames(self, outputdir, nFrames, random=True, seed=42):
         """
@@ -264,14 +261,13 @@ class AnnotationParser:
             os.mkdir(outputdir)
 
         basename = os.path.splitext(os.path.basename(self.fname))[0]
-        fLabels = os.path.join(outputdir, basename) +  '.labels.csv'
+        fLabels = os.path.join(outputdir, basename) + '.labels.csv'
         print(f'Writing frame labels to {fLabels}')
         labels.to_csv(fLabels, index=False)
 
         # Write frames
         print(f'Extracting {nFrames} frames per state ({len(labels)} in total) to {outputdir}')
         writeFrames(labels, self.inputdir, outputdir)
-
 
 
 if __name__ == '__main__':
