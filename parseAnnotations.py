@@ -199,7 +199,15 @@ class AnnotationParser:
 
         def splitKeypointValues(x):
             "Convert annotation info to a Series with the keys and values"
-            return pd.Series(x).rename(index=dict(zip(self.labels['class'], self.labels['aname'])))
+            class_to_aname = dict(zip(self.labels['class'], self.labels['aname']))
+            aname_to_class = dict(zip(self.labels['aname'], self.labels['class']))
+
+            # Explicitly converts (no value in JSON) to (NaN in Python)
+            # for Exploitable videos. If not, column won't be created
+            if aname_to_class['exploitable'] not in x:
+                x[aname_to_class['exploitable']] = float('nan')
+
+            return pd.Series(x).rename(index=class_to_aname)
 
         DFS = [
             d['av'].apply(splitKeypointValues),  # annotation info
