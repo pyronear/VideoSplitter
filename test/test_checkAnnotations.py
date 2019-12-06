@@ -5,6 +5,7 @@ import parseAnnotations
 import checkAnnotations
 from test_parseAnnotations import setupTester
 
+
 def setUpChecker(cls):
     """
     """
@@ -13,6 +14,7 @@ def setUpChecker(cls):
     cls.parser.writeCsv(cls.tmpdir.name)
     cls.parser.writeFrames(cls.tmpdir.name, nFrames=2, random=False)
     cls.checker = checkAnnotations.AnnotationChecker(cls.tmpdir.name)
+
 
 class test_checkAnnotations(unittest.TestCase):
     """
@@ -37,7 +39,6 @@ class test_checkAnnotations(unittest.TestCase):
         labels = self.checker.labels.copy()
         self.checker.updateValues()
         pd.testing.assert_frame_equal(labels, self.checker.labels)
-
 
 
 if __name__ == '__main__':
