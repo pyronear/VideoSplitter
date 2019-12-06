@@ -131,13 +131,15 @@ class AnnotationParser:
 
     Args:
     - fname: str, json file
-    - inputdir: str, path of movie files (default: '.')
+    - inputdir: str, path of original (unsplit) movie files (default: '.')
     - defineStates: bool, define states from keypoints (default: True)
 
     Attributes:
     - labels: description of the information used in the annotations
 
-    - files:
+    - files: list of movie files loaded for annotations. Some information about the files
+      like fBase, fps, etc are only filled in case there are annotation points
+
             fid 	fname 	fBase 	fps 	splitStart 	splitEnd
     0 	1 	10.mp4 	10.mp4 	25.0 	NaN 	NaN
     1 	2 	19_seq0_591.mp4 	19.mp4 	25.0 	0.0 	591.0
