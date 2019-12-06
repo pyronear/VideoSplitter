@@ -59,8 +59,11 @@ def setupTester(cls):
     Setup tester for AnnotationParser
     """
     inputJson = Path(sys.argv[0]).parent/'test_3_videos.json'
+    inputJson_only_exploitable = Path(sys.argv[0]).parent/'test_3_videos_only_exploitable.json')
     inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
+
     cls.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
+    cls.parser_only_exploitable = parseAnnotations.AnnotationParser(inputJson_only_exploitable, inputdir=inputdir)
 
 class test_parseAnnotations(unittest.TestCase):
     """
@@ -70,6 +73,16 @@ class test_parseAnnotations(unittest.TestCase):
     def setUpClass(cls):
         "Setup only once for all tests"
         setupTester(cls)
+
+    def test_columns_are_right(self):
+        for col_name in self.parser.labels['aname']:
+            if col_name != 'spatial':  # spatial is expected to be dropped during the parsing
+                self.assertIn(col_name, self.parser.keypoints.columns)
+
+        # When all video are exploitable, is the column correctly created ?
+        for col_name in self.parser_only_exploitable.labels['aname']:
+            if col_name != 'spatial':  # spatial is expected to be dropped during the parsing
+                self.assertIn(col_name, self.parser_only_exploitable.keypoints.columns)
 
 
     def test_files(self):
