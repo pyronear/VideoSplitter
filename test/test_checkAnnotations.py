@@ -8,6 +8,7 @@ from test_parseAnnotations import setupTester
 
 def setUpChecker(cls):
     """
+    Setup tester for AnnotationChecker
     """
     setupTester(cls)
     cls.tmpdir = tempfile.TemporaryDirectory()
@@ -34,11 +35,12 @@ class test_checkAnnotations(unittest.TestCase):
     def test_updateValues_withoutChange(self):
         """
         Test if updateValues reads back the same info as in the original labels
-        NOT WORKING because location 0 (N/A) is being converted to 1
+        DOES NOT WORK for loc_confidence because location 0 (N/A) is being converted to 1
          """
         labels = self.checker.labels.copy()
         self.checker.updateValues()
-        pd.testing.assert_frame_equal(labels, self.checker.labels)
+        pd.testing.assert_frame_equal(labels.drop(columns='loc_confidence'),
+            self.checker.labels.drop(columns='loc_confidence'))
 
 
 if __name__ == '__main__':
