@@ -61,10 +61,33 @@ def setupTester(cls):
     """
     inputJson = Path(sys.argv[0]).parent / 'test_3_videos.json'
     inputJson_only_exploitable = Path(sys.argv[0]).parent / 'test_3_videos_only_exploitable.json'
-    inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
+    cls.inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
+    if not cls.inputdir.exists():
+        loadMovies(cls)
 
-    cls.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
-    cls.parser_only_exploitable = parseAnnotations.AnnotationParser(inputJson_only_exploitable, inputdir=inputdir)
+    cls.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=cls.inputdir)
+    cls.parser_only_exploitable = parseAnnotations.AnnotationParser(inputJson_only_exploitable, inputdir=cls.inputdir)
+
+
+def loadMovies(cls):
+    "Load test movies"
+    import urllib
+    import os
+    import yaml
+    import tempfile
+    import pafy
+
+    cls.tmpdir = tempfile.TemporaryDirectory()
+    cls.inputdir = cls.tmpdir.name
+    yamlFile = "https://gist.githubusercontent.com/blenzi/d01fb4bf68256ed05ecbb11df226d0f2/raw"
+
+    with urllib.request.urlopen(yamlFile) as yF:
+        URLs = yaml.safe_load(yF)
+    for dest, url in URLs.items():
+        vid = pafy.new(url)
+        stream = vid.getbest()
+        print(f'Downloading {stream.get_filesize()/1e6:.2f} MB')
+        stream.download(os.path.join(cls.inputdir, dest))
 
 
 class test_parseAnnotations(unittest.TestCase):
@@ -75,6 +98,14 @@ class test_parseAnnotations(unittest.TestCase):
     def setUpClass(cls):
         "Setup only once for all tests"
         setupTester(cls)
+
+    @classmethod
+    def tearDown(cls):
+        "Clear temporary directory if it was created"
+        try:
+            cls.tmpdir.cleanup()
+        except AttributeError:
+            pass
 
     def test_columns_are_right(self):
         for col_name in self.parser.labels['aname']:
