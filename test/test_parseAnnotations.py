@@ -59,8 +59,9 @@ def setupTester(cls):
     """
     Setup tester for AnnotationParser
     """
-    inputJson = Path(sys.argv[0]).parent / 'test_3_videos.json'
-    inputJson_only_exploitable = Path(sys.argv[0]).parent / 'test_3_videos_only_exploitable.json'
+    parent = Path(__file__).parent
+    inputJson = parent / 'test_3_videos.json'
+    inputJson_only_exploitable = parent / 'test_3_videos_only_exploitable.json'
     cls.inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
     if not cls.inputdir.exists():
         loadMovies(cls)
