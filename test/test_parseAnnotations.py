@@ -9,7 +9,7 @@ import sys
 
 class test_functions(unittest.TestCase):
     """
-    Test auxiliary functions used by jsonParser
+    Test auxiliary functions used by AnnotationParser
     """
     def test_splitStates1(self):
         "Split states with start and endpoints"
