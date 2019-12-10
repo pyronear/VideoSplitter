@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from functools import partial
-import sys
 
 
 class test_functions(unittest.TestCase):
