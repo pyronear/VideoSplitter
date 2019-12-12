@@ -70,6 +70,15 @@ def pickFrames(state, nFrames, random=True, seed=42):
     - random: bool (default: True). Pick frames randomly or according to np.linspace,
       e.g. first if nFrames = 1, + last if nFrames = 2, + middle if nFrames = 3, etc
     - seed: int, seed for random picking (default: 42)
+
+    Example:
+    state = pd.Series({'stateStart': 0, 'stateEnd': 100})
+    pickFrames(state, 3, random=False)
+
+0      0
+1     50
+2    100
+dtype: int64
     """
     np.random.seed(seed)
     if random:
@@ -78,17 +87,24 @@ def pickFrames(state, nFrames, random=True, seed=42):
         return pd.Series(np.linspace(state.stateStart, state.stateEnd, nFrames, dtype=int))
 
 
-def getFrameLabels(states, nFrames, **kw):
+def getFrameLabels(states, nFrames, from_labels=False, **kw):
     """
-    Given a DataFrame with states, call pickFrames to create a DataFrame with
+    Given a DataFrame with states or labels, call pickFrames to create a DataFrame with
     nFrames per state containing the state information, filename and
     imgFile (the name of the file to be used when writing an image)
+
+    If from_labels is True, the input DataFrame should contain in addition columns
+    'frame' and 'imgFile'.
+    Ignore those columns and pick the frames again based on the new criteria
 
     Args:
     - states: DataFrame containing fBase, stateStart, stateEnd
     - nFrames: int, number of frames per state
+    - from_labels: bool, default False
     - kw: list of keyword arguments for pickFrames
     """
+    if from_labels:
+        states = states.drop(columns=['frame', 'imgFile']).drop_duplicates()
     fcn = partial(pickFrames, nFrames=nFrames, **kw)
     # DataFrame containing columns (0..nFrames - 1)
     frames = states.apply(fcn, axis=1)

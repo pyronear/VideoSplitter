@@ -43,7 +43,14 @@ class test_functions(unittest.TestCase):
 
         pd.testing.assert_frame_equal(parseAnnotations.splitStates(b), states_b)
 
+    def test_pickFrames0(self):
+        "Simple test of pickFrames"
+        state = pd.Series({'stateStart': 0, 'stateEnd': 100})
+        frames = pd.Series([0, 50, 100])
+        pd.testing.assert_series_equal(frames, parseAnnotations.pickFrames(state, 3, random=False))
+
     def test_pickFrames(self):
+        "Test of pickFrames for DataFrame"
         states_a = pd.DataFrame({'fire': [0, 1, 1],
                                  'clf_confidence': [1, 0, 1],
                                  'loc_confidence': [0, 0, 0],
@@ -54,13 +61,47 @@ class test_functions(unittest.TestCase):
         x = states_a.apply(partial(parseAnnotations.pickFrames, nFrames=3, random=False), axis=1)
         pd.testing.assert_frame_equal(x, frames)
 
+    def test_getFrameLabels(self):
+        states_a = pd.DataFrame({'fBase': '10.mp4',
+                                 'stateStart': [0, 100, 200],
+                                 'stateEnd': [99, 199, 500]})
+
+        labels_a = pd.DataFrame({'fBase': '10.mp4',
+                                 'stateStart': [0, 0, 100, 100, 200, 200],
+                                 'stateEnd': [99, 99, 199, 199, 500, 500],
+                                 'frame': [0, 99, 100, 199, 200, 500],
+                                 'imgFile': ['10_frame0.png', '10_frame99.png',
+                                             '10_frame100.png', '10_frame199.png',
+                                             '10_frame200.png', '10_frame500.png']})
+
+        labels = parseAnnotations.getFrameLabels(states_a, nFrames=2, random=False)
+        # Indices are not important and are reshuffled when sorting by fBase and frame
+        pd.testing.assert_frame_equal(labels.reset_index(drop=True), labels_a)
+
+        # Test if can pick frames again from labels
+        labels_again = parseAnnotations.getFrameLabels(labels, nFrames=2, random=False, from_labels=True)
+        pd.testing.assert_frame_equal(labels_again.reset_index(drop=True), labels_a)
+
+        # Test if can pick frames again from labels with different options
+        labels_b = pd.DataFrame({'fBase': '10.mp4',
+                                 'stateStart': [0, 0, 0, 100, 100, 100, 200, 200, 200],
+                                 'stateEnd': [99, 99, 99, 199, 199, 199, 500, 500, 500],
+                                 'frame': [0, 49, 99, 100, 149, 199, 200, 350, 500],
+                                 'imgFile': ['10_frame0.png', '10_frame49.png',
+                                             '10_frame99.png', '10_frame100.png',
+                                             '10_frame149.png', '10_frame199.png',
+                                             '10_frame200.png', '10_frame350.png',
+                                             '10_frame500.png']})
+        labels3 = parseAnnotations.getFrameLabels(labels, nFrames=3, random=False, from_labels=True)
+        pd.testing.assert_frame_equal(labels3.reset_index(drop=True), labels_b)
+
 
 def setupTester(cls):
     """
     Setup tester for AnnotationParser
     """
     inputJson = Path(sys.argv[0]).parent / 'test_3_videos.json'
-    inputJson_only_exploitable = Path(sys.argv[0]).parent/'test_3_videos_only_exploitable.json')
+    inputJson_only_exploitable = Path(sys.argv[0]).parent/'test_3_videos_only_exploitable.json'
     inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
 
     cls.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
