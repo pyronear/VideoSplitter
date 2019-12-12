@@ -60,7 +60,7 @@ def setupTester(cls):
     Setup tester for AnnotationParser
     """
     inputJson = Path(sys.argv[0]).parent / 'test_3_videos.json'
-    inputJson_only_exploitable = Path(sys.argv[0]).parent/'test_3_videos_only_exploitable.json')
+    inputJson_only_exploitable = Path(sys.argv[0]).parent/'test_3_videos_only_exploitable.json'
     inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
 
     cls.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
