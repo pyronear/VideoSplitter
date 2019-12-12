@@ -101,9 +101,9 @@ def getFrameLabels(states, nFrames, **kw):
     return df.sort_values(['fBase', 'frame'])
 
 
-def writeFrames(labels, inputdir, outputdir):
+def extractFrames(labels, inputdir, outputdir):
     """
-    Extract frames from <inputfile>/<fBase> and write frames as
+    Extract frames from <inputdir>/<fBase> and write frames as
     <outputdir>/<fBase>_frame<frame>.png
 
     Args:
@@ -277,7 +277,7 @@ class AnnotationParser:
 
         # Write frames
         print(f'Extracting {nFrames} frames per state ({len(labels)} in total) to {outputdir}')
-        writeFrames(labels, self.inputdir, outputdir)
+        extractFrames(labels, self.inputdir, outputdir)
 
 
 if __name__ == '__main__':
