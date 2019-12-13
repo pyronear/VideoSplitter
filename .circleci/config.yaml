@@ -40,7 +40,7 @@ jobs:
           key: v1-dependencies-{{ checksum "requirements.txt" }}
 
       # run tests!
-      # this example uses Django's built-in test-runner
+      # this example uses unittest
       # other common Python testing frameworks include pytest and nose
       # https://pytest.org
       # https://nose.readthedocs.io
