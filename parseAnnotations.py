@@ -117,7 +117,7 @@ def getFrameLabels(states, nFrames, from_labels=False, **kw):
     return df.sort_values(['fBase', 'frame'])
 
 
-def extractFrames(labels, inputdir, outputdir):
+def extractFrames(labels, inputdir, outputdir, size=None):
     """
     Extract frames from <inputdir>/<fBase> and write frames as
     <outputdir>/<fBase>_frame<frame>.png
@@ -126,6 +126,8 @@ def extractFrames(labels, inputdir, outputdir):
     - labels: DataFrame containing fBase, frame, imgFile
     - inputdir: str, directory containing movie files
     - outputdir: str, output directory. Created if needed
+    - size: tuple (width, height), default None. Size of frame in pixels.
+      If None, keep the original size
     """
     if not os.path.isdir(outputdir):
         os.mkdir(outputdir)
@@ -135,6 +137,8 @@ def extractFrames(labels, inputdir, outputdir):
             movie.set(cv2.CAP_PROP_POS_FRAMES, row.frame)
             success, frame = movie.read()
             if success:
+                if size is not None:
+                    frame = cv2.resize(frame, size)
                 cv2.imwrite(os.path.join(outputdir, row.imgFile), frame)
             else:
                 print(f'Could not read frame {row.frame} from {name}')
