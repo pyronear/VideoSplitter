@@ -2,14 +2,14 @@ import unittest
 import parseAnnotations
 import numpy as np
 import pandas as pd
+import tempfile
 from pathlib import Path
 from functools import partial
-import sys
 
 
-class test_functions(unittest.TestCase):
+class TestFunctions(unittest.TestCase):
     """
-    Test auxiliary functions used by jsonParser
+    Test auxiliary functions used by AnnotationParser
     """
     def test_splitStates1(self):
         "Split states with start and endpoints"
@@ -57,23 +57,43 @@ class test_functions(unittest.TestCase):
 
 def setupTester(cls):
     """
-    Setup tester for AnnotationParser
+    Setup tester for AnnotationParser. Also used by test_checkAnnotation
+    Download movies if needed and create 2 instances of AnnotationParser
+    from the json files in this directory
     """
-    inputJson = Path(sys.argv[0]).parent / 'test_3_videos.json'
-    inputJson_only_exploitable = Path(sys.argv[0]).parent / 'test_3_videos_only_exploitable.json'
-    inputdir = Path('~/Workarea/Pyronear/Wildfire').expanduser()
+    parent = Path(__file__).parent
+    movies_dir = parent / 'movies'
+    inputJson = parent / 'test_3_videos.json'
+    inputJson_only_exploitable = parent / 'test_3_videos_only_exploitable.json'
+    # TODO: maybe better to use a tmp directory, but couldn't make it work
+    cls.inputdir = movies_dir
+    if not movies_dir.exists():
+        cls.inputdir.mkdir()
+        import urllib
+        import yaml
+        import pafy
+        yamlFile = "https://gist.githubusercontent.com/blenzi/d01fb4bf68256ed05ecbb11df226d0f2/raw"
 
-    cls.parser = parseAnnotations.AnnotationParser(inputJson, inputdir=inputdir)
-    cls.parser_only_exploitable = parseAnnotations.AnnotationParser(inputJson_only_exploitable, inputdir=inputdir)
+        with urllib.request.urlopen(yamlFile) as yF:
+            URLs = yaml.safe_load(yF)
+        for dest, url in URLs.items():
+            vid = pafy.new(url)
+            stream = vid.getbest()
+            print(f'Downloading {stream.get_filesize()/1e6:.2f} MB')
+            stream.download(cls.inputdir / dest)
+
+    Parser = parseAnnotations.AnnotationParser
+    cls.parser = Parser(inputJson, inputdir=cls.inputdir)
+    cls.parser_only_exploitable = Parser(inputJson_only_exploitable, inputdir=cls.inputdir)
 
 
-class test_parseAnnotations(unittest.TestCase):
+class TestAnnotationParser(unittest.TestCase):
     """
     Test parseAnnotations
     """
     @classmethod
     def setUpClass(cls):
-        "Setup only once for all tests"
+        "Setup once for all tests"
         setupTester(cls)
 
     def test_columns_are_right(self):
@@ -108,7 +128,6 @@ class test_parseAnnotations(unittest.TestCase):
         pass
 
     def test_writeCsv(self):
-        import tempfile
         with tempfile.TemporaryDirectory() as tmpdirname:
             self.parser.writeCsv(tmpdirname)
             tmpdir = Path(tmpdirname)
@@ -118,6 +137,19 @@ class test_parseAnnotations(unittest.TestCase):
             statesFile = (tmpdir / basename).with_suffix('.states.csv')
             self.assertTrue(statesFile.exists())
             # TODO: test reading csv and comparing with original
+
+    def test_writeFrames(self):
+        "Test writing frames and check if directory containg only the images and csv file"
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            self.parser.writeFrames(tmpdirname, nFrames=2, random=False)
+            tmpdir = Path(tmpdirname)
+            csvFile = tmpdir / 'test_3_videos.labels.csv'
+            self.assertTrue(csvFile.exists())
+            labels = pd.read_csv(csvFile)
+            self.assertEqual(len(labels), 10)  # number of frames
+            for file in labels.imgFile:
+                assert (tmpdir / file).exists(), f'{file} not found'
+            self.assertEqual(len(list(tmpdir.iterdir())), 11)  # csv + 10 images
 
 
 if __name__ == '__main__':
