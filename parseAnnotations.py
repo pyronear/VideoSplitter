@@ -213,7 +213,7 @@ class AnnotationParser:
 
         DFS = [
             d['av'].apply(splitKeypointValues),  # annotation info
-            pd.DataFrame(d.xy.tolist(), columns=['dummy', 'x', 'y']),  # split xy
+            pd.DataFrame([xy[0:3] for xy in d.xy.tolist()], columns=['dummy', 'x', 'y']),  # split xy
             pd.DataFrame(d.z.tolist(), columns=['t']),  # time of keypoint
         ]
         d = d.join(DFS).drop(columns=['fid', 'xy', 'av', 'dummy', 'vid', 'z', 'spatial'])\
