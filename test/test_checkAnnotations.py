@@ -17,7 +17,7 @@ def setUpChecker(cls):
     cls.checker = checkAnnotations.AnnotationChecker(cls.tmpdir.name)
 
 
-class test_checkAnnotations(unittest.TestCase):
+class TestCheckAnnotations(unittest.TestCase):
     """
     Test the functional part of checkAnnotations, cannot test the graphical part.
     Relies on parseAnnotations for the setup
@@ -40,7 +40,7 @@ class test_checkAnnotations(unittest.TestCase):
         labels = self.checker.labels.copy()
         self.checker.updateValues()
         pd.testing.assert_frame_equal(labels.drop(columns='loc_confidence'),
-            self.checker.labels.drop(columns='loc_confidence'))
+                                      self.checker.labels.drop(columns='loc_confidence'))
 
 
 if __name__ == '__main__':
