@@ -80,7 +80,7 @@ def setupTester(cls):
             vid = pafy.new(url)
             stream = vid.getbest()
             print(f'Downloading {stream.get_filesize()/1e6:.2f} MB')
-            stream.download(cls.inputdir / dest)
+            stream.download(filepath=(cls.inputdir / dest).as_posix())
 
     Parser = parseAnnotations.AnnotationParser
     cls.parser = Parser(inputJson, inputdir=cls.inputdir)
