@@ -80,7 +80,8 @@ def setupTester(cls):
             vid = pafy.new(url)
             stream = vid.getbest()
             print(f'Downloading {stream.get_filesize()/1e6:.2f} MB')
-            stream.download(filepath=(cls.inputdir / dest).as_posix())
+            # youtube-dl behind pafy does not support Pathlib objects, str is okay
+            stream.download(filepath=str(cls.inputdir / dest))
 
     Parser = parseAnnotations.AnnotationParser
     cls.parser = Parser(inputJson, inputdir=cls.inputdir)
