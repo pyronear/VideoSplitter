@@ -228,7 +228,7 @@ class AnnotationParser:
              .fillna({'exploitable': True}).sort_values(['fname', 't'])
 
         # Convert time to frame
-        d['frame'] = np.round(d.fps * d.t.fillna(0)) + d.splitStart.fillna(0) #
+        d['frame'] = np.round(d.fps * d.t.fillna(0)) + d.splitStart.fillna(0) 
 
         # Reject invalid keypoints
         # FIXME: frame == splitEnd can remove end of sequence.
