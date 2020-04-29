@@ -1,5 +1,5 @@
 import unittest
-import parseAnnotations
+import parseAnnotations 
 import numpy as np
 import pandas as pd
 import tempfile
@@ -65,6 +65,7 @@ def setupTester(cls):
     movies_dir = parent / 'movies'
     inputJson = parent / 'test_3_videos.json'
     inputJson_only_exploitable = parent / 'test_3_videos_only_exploitable.json'
+    inputJson_only_non_exploitable = parent / 'test_only_non_exploitable.json'
     # TODO: maybe better to use a tmp directory, but couldn't make it work
     cls.inputdir = movies_dir
     if not movies_dir.exists():
@@ -86,7 +87,7 @@ def setupTester(cls):
     Parser = parseAnnotations.AnnotationParser
     cls.parser = Parser(inputJson, inputdir=cls.inputdir)
     cls.parser_only_exploitable = Parser(inputJson_only_exploitable, inputdir=cls.inputdir)
-
+    cls.parser_only_non_exploitable = Parser(inputJson_only_non_exploitable, inputdir=cls.inputdir)
 
 class TestAnnotationParser(unittest.TestCase):
     """
