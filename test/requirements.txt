@@ -1,0 +1,5 @@
+flake8>=3.8.1
+pafy==0.5.4
+pyaml>=20.4.0
+imutils>=0.5.3
+youtube-dl==2019.11.5

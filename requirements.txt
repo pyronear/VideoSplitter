@@ -1,0 +1,3 @@
+moviepy>=1.0.3
+opencv-python>=4.2.0.34
+pytesseract>=0.3.4

@@ -6,13 +6,19 @@ To split a video into sequences of frames with the same camera settings: coordin
 
 ### Prerequisites
 
-- Python 3.6 (or more recent)
+- Python 3.7 (or more recent)
 - [pip](https://pip.pypa.io/en/stable/)
 - [tesseract](https://github.com/tesseract-ocr/tesseract)
 
 ### Installation
 
-`pip install opencv-python pillow pytesseract moviepy`
+`pip install -r requirements.txt`
+
+To run tests locally:
+```
+pip install -r test/requirements.txt
+python -m unittest discover test/
+```
 
 ## Usage
 
