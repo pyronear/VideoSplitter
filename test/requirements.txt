@@ -1,5 +1,5 @@
 flake8>=3.8.1
-pafy==0.5.4
+pafy>=0.5.5
 pyaml>=20.4.0
 imutils>=0.5.3
-youtube-dl==2019.11.5
+youtube-dl>=2020.3.24
